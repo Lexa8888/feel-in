@@ -1,0 +1,24 @@
+{
+  "pairs": {
+    "FEEL-J1KC": {
+      "id": "FEEL-J1KC",
+      "userA": "A",
+      "userB": null,
+      "statusA": "🟢",
+      "statusB": "⚡",
+      "streak": 0,
+      "lastRitual": null,
+      "diary": [],
+      "peace": {
+        "active": false,
+        "from": null
+      },
+      "quiz": {
+        "q": "Что для вас значит \"время вместе\"?",
+        "ansA": "близость",
+        "ansB": null,
+        "revealed": false
+      }
+    }
+  }
+}

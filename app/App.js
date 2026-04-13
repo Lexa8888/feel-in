@@ -1,10 +1,20 @@
 import { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, Alert, Keyboard } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, Alert, Keyboard, Platform } from 'react-native';
 import io from 'socket.io-client';
 import axios from 'axios';
+import * as Notifications from 'expo-notifications';
 
-// ✅ ОБНОВЛЕНО: URL облачного сервера на Render
+// ✅ URL облачного сервера на Render
 const SERVER_URL = 'https://feel-in.onrender.com';
+
+// Настройка обработки уведомлений (когда приложение открыто)
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 export default function App() {
   const [screen, setScreen] = useState('pairing');
@@ -13,12 +23,80 @@ export default function App() {
   const [data, setData] = useState(null);
   const [socket, setSocket] = useState(null);
   const [diaryText, setDiaryText] = useState('');
+  const [pushToken, setPushToken] = useState(null);
 
   // Подключение к серверу
   useEffect(() => {
     const newSocket = io(SERVER_URL);
     setSocket(newSocket);
     return () => newSocket.disconnect();
+  }, []);
+
+  // Запрос разрешений и регистрация токена уведомлений
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Notifications.requestPermissionsAsync();
+        if (status !== 'granted') {
+          console.log('❌ Нет разрешения на уведомления');
+          return;
+        }
+        
+        const token = (await Notifications.getExpoPushTokenAsync()).data;
+        console.log('🔔 Expo Push Token:', token);
+        setPushToken(token);
+        
+        // Сохраняем токен в сокете
+        if (socket && data?.id) {
+          socket.emit('register-push-token', { token, userId, pairCode: data.id });
+        }
+        
+        // Ежедневное напоминание о ритуале в 9:00
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: '❤️ Время ритуала!',
+            body: 'Напиши комплимент партнёру и укрепи вашу связь ✨',
+            data: { screen: 'ritual' },
+          },
+          trigger: {
+            hour: 9,
+            minute: 0,
+            repeats: true,
+          },
+        });
+        
+        console.log('📅 Напоминание о ритуале запланировано на 9:00');
+      } catch (error) {
+        console.error('Ошибка настройки уведомлений:', error);
+      }
+    })();
+  }, [socket, data, userId]);
+
+  // Отправка токена при подключении к паре
+  useEffect(() => {
+    if (socket && pushToken && data?.id) {
+      socket.emit('register-push-token', { token: pushToken, userId, pairCode: data.id });
+    }
+  }, [socket, pushToken, data, userId]);
+
+  // Обработка входящих уведомлений
+  useEffect(() => {
+    const subscription = Notifications.addNotificationReceivedListener(notification => {
+      console.log('🔔 Получено уведомление:', notification);
+    });
+    
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('🔔 Пользователь нажал на уведомление');
+      const screen = response.notification.request.content.data?.screen;
+      if (screen) {
+        // Можно добавить навигацию при клике
+      }
+    });
+    
+    return () => {
+      subscription.remove();
+      responseSubscription.remove();
+    };
   }, []);
 
   // Слушаем обновления от сервера в реальном времени
@@ -83,7 +161,7 @@ export default function App() {
     <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
       <Text style={styles.header}>🔋 Состояние сегодня</Text>
       <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
-        {['🔴', '🟡', '🟢', '⚡'].map(v => (
+        {['🔴', '', '🟢', '⚡'].map(v => (
           <TouchableOpacity key={v} style={styles.statusBtn} onPress={() => updateStatus(v)}>
             <Text style={{ fontSize: 28 }}>{v}</Text>
           </TouchableOpacity>

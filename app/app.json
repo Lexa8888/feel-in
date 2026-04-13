@@ -17,9 +17,18 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "notification": {
+      "icon": "./assets/icon.png",
+      "color": "#FF6B6B",
+      "androidMode": "default",
+      "androidCollapsedTitle": "Новое от Feel in"
+    },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.feelin.app"
+      "bundleIdentifier": "com.feelin.app",
+      "infoPlist": {
+        "UIBackgroundModes": ["remote-notification"]
+      }
     },
     "android": {
       "adaptiveIcon": {

@@ -4,6 +4,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
+const { Expo } = require('expo-server-sdk');
 
 const app = express();
 app.use(cors());
@@ -16,6 +17,39 @@ const io = new Server(server, { cors: { origin: '*' } });
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Инициализация Expo Push
+const expo = new Expo();
+
+// Хранилище токенов: { pairCode: { A: 'ExpoPushToken...', B: '...' } }
+const pushTokens = {};
+
+// Функция отправки пуш-уведомления
+async function sendPushNotification(toToken, title, body, data = {}) {
+  if (!Expo.isExpoPushToken(toToken)) {
+    console.error(`❌ Invalid push token: ${toToken}`);
+    return;
+  }
+  
+  const messages = [{
+    to: toToken,
+    sound: 'default',
+    title,
+    body,
+    data,
+  }];
+  
+  const chunks = expo.chunkPushNotifications(messages);
+  
+  for (const chunk of chunks) {
+    try {
+      const receipts = await expo.sendPushNotificationsAsync(chunk);
+      console.log('✅ Push sent:', receipts);
+    } catch (error) {
+      console.error('❌ Push error:', error);
+    }
+  }
+}
 
 // Генерация кода пары
 app.post('/api/pair/create', async (req, res) => {
@@ -50,7 +84,6 @@ app.post('/api/pair/create', async (req, res) => {
 app.post('/api/pair/join', async (req, res) => {
   const { code, userId } = req.body;
   
-  // Ищем пару
   const {  pair, error: fetchError } = await supabase
     .from('pairs')
     .select('*')
@@ -64,7 +97,6 @@ app.post('/api/pair/join', async (req, res) => {
   else if (!pair.user_b) updateData.user_b = userId;
   else return res.status(400).json({ error: 'Пара уже заполнена' });
 
-  // Обновляем
   const { error: updateError } = await supabase
     .from('pairs')
     .update(updateData)
@@ -73,7 +105,6 @@ app.post('/api/pair/join', async (req, res) => {
   if (updateError) return res.status(500).json({ error: 'Update error' });
 
   console.log(`👤 ${userId} присоединился к паре ${code}`);
-  // Возвращаем обновленные данные
   const {  updatedPair } = await supabase.from('pairs').select('*').eq('id', code).single();
   res.json({ pairId: code, pair: updatedPair });
 });
@@ -87,8 +118,20 @@ app.get('/api/pair/:code', async (req, res) => {
 
 // WebSocket: реальное время
 io.on('connection', (socket) => {
+  console.log('🔌 Клиент подключился:', socket.id);
+
+  // Регистрация токена для пуш-уведомлений
+  socket.on('register-push-token', ({ token, userId, pairCode }) => {
+    if (!pairCode || !token) return;
+    
+    if (!pushTokens[pairCode]) pushTokens[pairCode] = {};
+    pushTokens[pairCode][userId] = token;
+    console.log(`🔔 Токен зарегистрирован: ${userId} в паре ${pairCode}`);
+  });
+
   socket.on('join-pair', (code) => {
     socket.join(code);
+    console.log(`👥 Клиент ${socket.id} присоединился к комнате ${code}`);
   });
 
   socket.on('update-status', async ({ code, user, value }) => {
@@ -96,6 +139,14 @@ io.on('connection', (socket) => {
     await supabase.from('pairs').update({ [field]: value }).eq('id', code);
     const { data } = await supabase.from('pairs').select('*').eq('id', code).single();
     io.to(code).emit('status-updated', data);
+    
+    // Уведомление партнёру
+    const partnerId = user === 'A' ? 'B' : 'A';
+    const partnerToken = pushTokens[code]?.[partnerId];
+    if (partnerToken) {
+      const statusEmojis = { '🔴': 'плохо', '🟡': 'нормально', '🟢': 'хорошо', '⚡': 'отлично' };
+      await sendPushNotification(partnerToken, '🔋 Статус обновлён', `Партнёр чувствует себя ${statusEmojis[value] || 'изменилось'}`, { screen: 'home' });
+    }
   });
 
   socket.on('complete-ritual', async ({ code }) => {
@@ -120,12 +171,26 @@ io.on('connection', (socket) => {
     await supabase.from('pairs').update({ diary: updatedDiary }).eq('id', code);
     const { data } = await supabase.from('pairs').select('*').eq('id', code).single();
     io.to(code).emit('diary-updated', data);
+    
+    // Уведомление партнёру
+    const partnerId = user === 'A' ? 'B' : 'A';
+    const partnerToken = pushTokens[code]?.[partnerId];
+    if (partnerToken) {
+      await sendPushNotification(partnerToken, '💌 Новая запись', `${user} добавил(а) благодарность в дневник`, { screen: 'diary' });
+    }
   });
 
   socket.on('peace-request', async ({ code, user }) => {
     await supabase.from('pairs').update({ peace: { active: true, from: user } }).eq('id', code);
     const { data } = await supabase.from('pairs').select('*').eq('id', code).single();
     io.to(code).emit('peace-updated', data);
+    
+    // Уведомление партнёру
+    const partnerId = user === 'A' ? 'B' : 'A';
+    const partnerToken = pushTokens[code]?.[partnerId];
+    if (partnerToken) {
+      await sendPushNotification(partnerToken, '🕊️ Сигнал мира', `${user} хочет помириться. Нажмите, чтобы увидеть.`, { screen: 'home' });
+    }
   });
 
   socket.on('quiz-submit', async ({ code, user, ans }) => {
@@ -141,10 +206,15 @@ io.on('connection', (socket) => {
     const { data } = await supabase.from('pairs').select('*').eq('id', code).single();
     io.to(code).emit('quiz-updated', data);
   });
+
+  socket.on('disconnect', () => {
+    console.log('🔌 Клиент отключился:', socket.id);
+  });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🟢 Сервер Feel in запущен на порту ${PORT}`);
   console.log(`💾 Подключено к базе данных Supabase`);
+  console.log(`🔔 Push-уведомления готовы к работе`);
 });

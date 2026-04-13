@@ -1,20 +1,22 @@
 {
-  "name": "app",
+  "name": "server",
   "version": "1.0.0",
+  "description": "Feel In backend server",
   "main": "index.js",
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
-    "axios": "^1.15.0",
-    "expo": "~54.0.33",
-    "expo-status-bar": "~3.0.9",
-    "react": "19.1.0",
-    "react-native": "0.81.5",
-    "socket.io-client": "^4.8.3"
-  },
-  "private": true
+    "@supabase/supabase-js": "^2.39.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "expo-notifications": "~0.32.16",
+    "expo-server-sdk": "^3.7.0",
+    "express": "^5.1.0",
+    "socket.io": "^4.8.1"
+  }
 }

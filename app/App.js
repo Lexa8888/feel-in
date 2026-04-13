@@ -3,8 +3,8 @@ import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, Alert,
 import io from 'socket.io-client';
 import axios from 'axios';
 
-// ✅ ИСПРАВЛЕНО: добавлен http:// и :3000
-const SERVER_URL = 'http://192.168.1.38:3000';
+// ✅ ОБНОВЛЕНО: URL облачного сервера на Render
+const SERVER_URL = 'https://feel-in.onrender.com';
 
 export default function App() {
   const [screen, setScreen] = useState('pairing');
@@ -83,7 +83,7 @@ export default function App() {
     <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
       <Text style={styles.header}>🔋 Состояние сегодня</Text>
       <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
-        {['🔴', '', '🟢', '⚡'].map(v => (
+        {['🔴', '🟡', '🟢', '⚡'].map(v => (
           <TouchableOpacity key={v} style={styles.statusBtn} onPress={() => updateStatus(v)}>
             <Text style={{ fontSize: 28 }}>{v}</Text>
           </TouchableOpacity>

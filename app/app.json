@@ -6,35 +6,21 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
+    "host": "lan",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#121212"
     },
     "updates": {
       "fallbackToCacheTimeout": 0
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
-    "notification": {
-      "icon": "./assets/icon.png",
-      "color": "#FF6B6B",
-      "androidMode": "default",
-      "androidCollapsedTitle": "Новое от Feel in"
-    },
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.feelin.app",
-      "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
-      }
+      "bundleIdentifier": "com.feelin.app"
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#121212"
-      },
       "package": "com.feelin.app"
     },
     "web": {
@@ -42,7 +28,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": ""
+        "projectId": "0636e412-9635-4a63-a35d-bf97572f3861"
       }
     }
   }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, Animated } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, Animated, Alert } from 'react-native';
 import io from 'socket.io-client';
 import axios from 'axios';
 import './web.css';
@@ -10,6 +10,7 @@ const COLORS = {
   bg: '#0F0F1A', card: 'rgba(255,255,255,0.08)', cardBorder: 'rgba(255,255,255,0.15)',
   primary: '#FF6B6B', secondary: '#4ECDC4', accent: '#FFE66D', text: '#FFFFFF',
   textDim: '#A0A0B0', success: '#4CAF50', warning: '#FFB347', peace: '#2D4A3E',
+  danger: '#FF4444',
 };
 
 const TRANSLATIONS = {
@@ -51,6 +52,8 @@ const TRANSLATIONS = {
     peaceSent: '🕊️ Сигнал отправлен', partnerNotified: 'Партнёр получит уведомление',
     writeCompliment: 'Сначала напиши комплимент!',
     language: '🌐 Язык', russian: 'Русский', english: 'English',
+    leavePair: '🚪 Выйти из пары', confirmLeave: 'Точно выйти из пары?',
+    selectRole: '⚠️ Выбери роль (М или Ж)',
   },
   en: {
     appName: 'Feel in', tagline: 'Feel each other from afar ✨',
@@ -90,6 +93,8 @@ const TRANSLATIONS = {
     peaceSent: '🕊️ Signal Sent', partnerNotified: 'Partner will be notified',
     writeCompliment: 'Write a compliment first!',
     language: '🌐 Language', russian: 'Русский', english: 'English',
+    leavePair: '🚪 Leave Pair', confirmLeave: 'Are you sure you want to leave?',
+    selectRole: '⚠️ Please select a role (M or F)',
   },
 };
 
@@ -117,7 +122,7 @@ const getTodaysQuizQuestion = (lang) => {
   return QUIZ_QUESTIONS[lang][questionIndex];
 };
 
-// 🔔 Уведомления (БЕЗ ЗВУКА)
+// 🔔 Уведомления
 let toastContainer = null;
 const initToastContainer = () => {
   if (!toastContainer) {
@@ -151,10 +156,16 @@ const showNotification = (title, body) => {
 export default function App() {
   const [lang, setLang] = useState(() => localStorage.getItem('feelIn_lang') || 'ru');
   const t = TRANSLATIONS[lang];
-  const [screen, setScreen] = useState('pairing');
-  const [pairCode, setPairCode] = useState('');
-  const [userId, setUserId] = useState('M');
-  const [data, setData] = useState(null);
+  
+  // 💾 Восстановление сессии из localStorage
+  const [screen, setScreen] = useState(() => localStorage.getItem('feelIn_screen') || 'pairing');
+  const [pairCode, setPairCode] = useState(() => localStorage.getItem('feelIn_pairCode') || '');
+  const [userId, setUserId] = useState(() => localStorage.getItem('feelIn_userId') || '');
+  const [data, setData] = useState(() => {
+    const saved = localStorage.getItem('feelIn_data');
+    return saved ? JSON.parse(saved) : null;
+  });
+  
   const [socket, setSocket] = useState(null);
   const [diaryText, setDiaryText] = useState('');
   const [ritualText, setRitualText] = useState('');
@@ -174,9 +185,31 @@ export default function App() {
     ]).start();
   }, []);
 
+  // 💾 Сохранение сессии при изменении состояния
+  useEffect(() => {
+    if (screen === 'home' && pairCode && userId) {
+      localStorage.setItem('feelIn_screen', 'home');
+      localStorage.setItem('feelIn_pairCode', pairCode);
+      localStorage.setItem('feelIn_userId', userId);
+      if (data) localStorage.setItem('feelIn_data', JSON.stringify(data));
+    } else {
+      localStorage.removeItem('feelIn_screen');
+      localStorage.removeItem('feelIn_pairCode');
+      localStorage.removeItem('feelIn_userId');
+      localStorage.removeItem('feelIn_data');
+    }
+  }, [screen, pairCode, userId, data]);
+
+  // 🔌 Инициализация сокетов
   useEffect(() => {
     const newSocket = io(SERVER_URL);
     setSocket(newSocket);
+    
+    // Если восстановлена сессия, сразу присоединяемся к комнате пары
+    if (screen === 'home' && data?.id) {
+      newSocket.emit('join-pair', data.id);
+    }
+
     return () => newSocket.disconnect();
   }, []);
 
@@ -199,7 +232,6 @@ export default function App() {
     
     const handlers = events.map(({ name, message }) => {
       const handler = (newData) => {
-        console.log(`📥 Получено событие ${name}:`, newData);
         setData(newData);
         showNotification('💫 Feel in', message);
       };
@@ -220,14 +252,40 @@ export default function App() {
     };
   }, [socket, t, userId]);
 
+  // 🚪 Выход из пары
+  const leavePair = () => {
+    Alert.alert(t.attention, t.confirmLeave, [
+      { text: 'Отмена', style: 'cancel' },
+      { 
+        text: 'Выйти', 
+        style: 'destructive',
+        onPress: () => {
+          socket?.disconnect();
+          setScreen('pairing');
+          setPairCode('');
+          setUserId('');
+          setData(null);
+          setMyStatus(null);
+          setRitualDone(false);
+          setHasAnsweredQuiz(false);
+          setQuizAnswer(null);
+          // Переподключаем сокет
+          const newSocket = io(SERVER_URL);
+          setSocket(newSocket);
+        }
+      }
+    ]);
+  };
+
   const createPair = async () => {
+    if (!userId) { showNotification(t.attention, t.selectRole); return; }
     try {
       setLoading(true);
       const res = await axios.post(`${SERVER_URL}/api/pair/create`);
       setPairCode(res.data.code);
-      // ✅ Инициализируем data, чтобы приложение сразу знало код пары
       setData({ code: res.data.code, id: res.data.pairId, streak: 0 });
-      setScreen('home'); // Переходим на главный экран
+      setScreen('home');
+      socket?.emit('join-pair', res.data.pairId);
       showNotification(t.pairCreated, t.yourCode.replace('{code}', res.data.code));
     } catch (e) { 
       showNotification(t.error, t.checkInternet); 
@@ -237,12 +295,13 @@ export default function App() {
   };
 
   const joinPair = async () => {
+    if (!userId) { showNotification(t.attention, t.selectRole); return; }
     if (!pairCode.trim()) { showNotification(t.attention, t.enterCode); return; }
     try {
       setLoading(true);
-      const res = await axios.post(`${SERVER_URL}/api/pair/join`, { code: pairCode, userId });
+      const res = await axios.post(`${SERVER_URL}/api/pair/join`, { code: pairCode.toUpperCase(), userId });
       setData(res.data.pair);
-      socket.emit('join-pair', res.data.pairId);
+      socket?.emit('join-pair', res.data.pairId);
       setScreen('home');
       showNotification(t.welcome, t.inPair);
     } catch (e) { showNotification(t.error, e.response?.data?.error || t.codeInvalid); }
@@ -251,8 +310,7 @@ export default function App() {
 
   const updateStatus = (val) => {
     const codeToSend = pairCode || data?.code;
-    if (!codeToSend) { showNotification(t.error, 'Код пары не найден'); return; }
-    
+    if (!codeToSend) return;
     setMyStatus(val);
     socket?.emit('update-status', { code: codeToSend, user: userId, value: val });
     showNotification(t.statusUpdated, t.yourMood.replace('{mood}', val));
@@ -260,15 +318,10 @@ export default function App() {
 
   const completeRitual = () => {
     const codeToSend = pairCode || data?.code;
-    if (!codeToSend) { showNotification(t.error, 'Код пары не найден'); return; }
-    
-    if (ritualDone) {
-      showNotification(t.attention, 'Уже выполнено!');
-      return;
-    }
+    if (!codeToSend) return;
+    if (ritualDone) { showNotification(t.attention, 'Уже выполнено!'); return; }
     if (!ritualText.trim()) { showNotification(t.attention, t.writeCompliment); return; }
     
-    console.log('❤️ Отправляем ритуал:', { code: codeToSend, user: userId, text: ritualText });
     socket?.emit('complete-ritual', { code: codeToSend, user: userId, text: ritualText });
     setRitualDone(true);
     setRitualText('');
@@ -277,46 +330,29 @@ export default function App() {
 
   const addDiary = () => {
     const codeToSend = pairCode || data?.code;
-    if (!codeToSend) { showNotification(t.error, 'Код пары не найден'); return; }
-    if (!diaryText.trim()) {
-      showNotification(t.attention, 'Напиши что-нибудь!');
-      return;
-    }
+    if (!codeToSend) return;
+    if (!diaryText.trim()) { showNotification(t.attention, 'Напиши что-нибудь!'); return; }
     
-    const textToSend = diaryText;
-    console.log('📝 Отправляем запись:', { code: codeToSend, user: userId, text: textToSend });
-    socket?.emit('add-diary', { code: codeToSend, user: userId, text: textToSend });
-    
-    setData(prevData => ({
-      ...prevData,
-      diary: [...(prevData?.diary || []), {
-        id: Date.now().toString(),
-        by: userId,
-        text: textToSend,
-        createdAt: new Date().toISOString()
-      }]
+    socket?.emit('add-diary', { code: codeToSend, user: userId, text: diaryText });
+    setData(prev => ({
+      ...prev,
+      diary: [...(prev?.diary || []), { id: Date.now().toString(), by: userId, text: diaryText, createdAt: new Date().toISOString() }]
     }));
-    
     setDiaryText('');
     showNotification(t.diaryAdded, t.thanksSincerity);
   };
 
   const sendPeace = () => {
     const codeToSend = pairCode || data?.code;
-    if (!codeToSend) { showNotification(t.error, 'Код пары не найден'); return; }
-    
+    if (!codeToSend) return;
     socket?.emit('peace-request', { code: codeToSend, user: userId });
     showNotification(t.peaceSent, t.partnerNotified);
   };
 
   const submitQuiz = (ans) => {
     const codeToSend = pairCode || data?.code;
-    if (!codeToSend) { showNotification(t.error, 'Код пары не найден'); return; }
-    
-    if (hasAnsweredQuiz) {
-      showNotification(t.attention, 'Уже ответили!');
-      return;
-    }
+    if (!codeToSend) return;
+    if (hasAnsweredQuiz) { showNotification(t.attention, 'Уже ответили!'); return; }
     setQuizAnswer(ans);
     setHasAnsweredQuiz(true);
     socket?.emit('quiz-submit', { code: codeToSend, user: userId, ans });
@@ -335,26 +371,10 @@ export default function App() {
     const handlePressOut = () => Animated.spring(scaleAnimBtn, { toValue: 1, friction: 8, useNativeDriver: false }).start();
     
     return (
-      <View style={{
-        width: '100%',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginVertical: 8,
-      }}>
+      <View style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', marginVertical: 8 }}>
         <TouchableOpacity 
-          style={[styles.button, styles[gradient], disabled && styles.buttonDisabled, {
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            marginLeft: 'auto',
-            marginRight: 'auto',
-          }]}
-          onPress={onPress} 
-          onPressIn={handlePressIn} 
-          onPressOut={handlePressOut} 
-          disabled={disabled} 
-          activeOpacity={0.8}
+          style={[styles.button, styles[gradient], disabled && styles.buttonDisabled]}
+          onPress={onPress} onPressIn={handlePressIn} onPressOut={handlePressOut} disabled={disabled} activeOpacity={0.8}
         >
           <Animated.View style={{ transform: [{ scale: scaleAnimBtn }] }}>
             <Text style={styles.buttonText}>{icon} {title}</Text>
@@ -402,6 +422,9 @@ export default function App() {
         <View style={styles.headerSmall}>
           <TouchableOpacity onPress={toggleLanguage} style={styles.langBtnSmall}>
             <Text style={styles.langTextSmall}>{lang === 'ru' ? '🇷 RU' : ' EN'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={leavePair} style={styles.leaveBtn}>
+            <Text style={styles.leaveText}>{t.leavePair}</Text>
           </TouchableOpacity>
         </View>
 
@@ -517,9 +540,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent', minHeight: '100vh', width: '100%' },
   scrollView: { flex: 1, width: '100%' },
   header: { alignItems: 'center', marginBottom: 30, paddingTop: 50, width: '100%' },
-  headerSmall: { alignItems: 'flex-end', padding: 15, width: '100%' },
+  headerSmall: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, width: '100%' },
   langBtn: { padding: 10, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.1)', marginTop: 15 },
   langBtnSmall: { padding: 8, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.1)' },
+  leaveBtn: { padding: 8, borderRadius: 8, backgroundColor: 'rgba(255,68,68,0.2)', borderWidth: 1, borderColor: COLORS.danger },
+  leaveText: { color: COLORS.danger, fontSize: 12, fontWeight: '600' },
   langText: { color: COLORS.text, fontSize: 14, fontWeight: '600' },
   langTextSmall: { color: COLORS.text, fontSize: 12, fontWeight: '600' },
   logo: { fontSize: 48, fontWeight: '900', color: '#FFFFFF', textAlign: 'center', letterSpacing: 3, marginBottom: 10 },
@@ -530,14 +555,7 @@ const styles = StyleSheet.create({
   section: { marginBottom: 25, paddingHorizontal: 20, width: '100%', alignItems: 'center' },
   sectionTitle: { fontSize: 20, fontWeight: '700', color: COLORS.text, marginBottom: 12, width: '100%' },
   
-  button: { 
-    paddingVertical: 16,
-    paddingHorizontal: 40,
-    borderRadius: 14, 
-    alignItems: 'center', 
-    justifyContent: 'center',
-    minWidth: 280,
-  },
+  button: { paddingVertical: 16, paddingHorizontal: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center', minWidth: 280, width: '100%' },
   buttonText: { color: '#fff', fontWeight: '700', fontSize: 16, textAlign: 'center' },
   buttonDisabled: { opacity: 0.5 },
   

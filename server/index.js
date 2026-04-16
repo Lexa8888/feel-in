@@ -3,6 +3,7 @@ const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const http = require('http');
 const socketIo = require('socket.io');
+const { Expo } = require('expo-server-sdk');
 
 const app = express();
 const server = http.createServer(app);
@@ -22,10 +23,22 @@ console.log('🔑 Supabase URL:', SUPABASE_URL);
 console.log('🔑 Supabase Key:', SUPABASE_ANON_KEY ? 'Set (hidden)' : 'MISSING!');
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+const expo = new Expo();
+
+const userPushTokens = {};
 const pairSockets = {};
 
 io.on('connection', (socket) => {
   console.log('🔌 Client connected:', socket.id);
+
+  socket.on('register-push-token', async ({ user, token, pairCode }) => {
+    console.log(`📱 Push token registered: User ${user}, Pair ${pairCode}`);
+    
+    if (!userPushTokens[pairCode]) {
+      userPushTokens[pairCode] = {};
+    }
+    userPushTokens[pairCode][user] = token;
+  });
 
   socket.on('join-pair', (pairId) => {
     console.log(`👥 Socket ${socket.id} joining pair: ${pairId}`);
@@ -39,7 +52,7 @@ io.on('connection', (socket) => {
       if (fetchError) throw fetchError;
 
       const updateField = user === 'M' ? 'status_a' : 'status_b';
-      const { data: updatedPair, error: updateError } = await supabase
+      const {  updatedPair, error: updateError } = await supabase
         .from('pairs')
         .update({ [updateField]: value, updated_at: new Date().toISOString() })
         .eq('code', code)
@@ -47,6 +60,25 @@ io.on('connection', (socket) => {
         .single();
 
       if (updateError) throw updateError;
+
+      const partner = user === 'M' ? 'Ж' : 'M';
+      const partnerToken = userPushTokens[code]?.[partner];
+      
+      if (partnerToken && Expo.isExpoPushToken(partnerToken)) {
+        try {
+          await expo.sendPushNotificationsAsync([{
+            to: partnerToken,
+            sound: 'default',
+            title: '💕 Feel In',
+            body: `Партнёр обновил настроение: ${value}`,
+            data: { code: code, type: 'status' }
+          }]);
+          console.log('🔔 Push sent: status update');
+        } catch (e) {
+          console.error('❌ Push error:', e);
+        }
+      }
+
       io.to(pairSockets[socket.id]).emit('status-updated', updatedPair);
     } catch (error) {
       console.error('❌ [status] Error:', error);
@@ -66,7 +98,7 @@ io.on('connection', (socket) => {
       const otherPartnerDone = pair[otherRitualField];
       const newStreak = otherPartnerDone ? (pair.streak || 0) + 1 : (pair.streak || 0);
 
-      const { data: updatedPair, error: updateError } = await supabase
+      const {  updatedPair, error: updateError } = await supabase
         .from('pairs')
         .update({ [ritualField]: text, last_ritual: today, streak: newStreak, updated_at: new Date().toISOString() })
         .eq('code', code)
@@ -78,6 +110,42 @@ io.on('connection', (socket) => {
       await supabase.from('rituals').insert({
         id: Date.now().toString(), pair_id: updatedPair.id, user_id: user, text, completed: true, completed_at: new Date().toISOString()
       });
+
+      const partner = user === 'M' ? 'Ж' : 'M';
+      const partnerToken = userPushTokens[code]?.[partner];
+      
+      if (partnerToken && Expo.isExpoPushToken(partnerToken)) {
+        try {
+          await expo.sendPushNotificationsAsync([{
+            to: partnerToken,
+            sound: 'default',
+            title: '❤️ Новый ритуал',
+            body: `Партнёр написал: "${text}"`,
+            data: { code: code, type: 'ritual' }
+          }]);
+          console.log('🔔 Push sent: ritual');
+        } catch (e) {
+          console.error('❌ Push error:', e);
+        }
+      }
+
+      if ([3, 5, 7].includes(newStreak)) {
+        const tokens = userPushTokens[code];
+        if (tokens) {
+          for (const [u, token] of Object.entries(tokens)) {
+            if (Expo.isExpoPushToken(token)) {
+              await expo.sendPushNotificationsAsync([{
+                to: token,
+                sound: 'default',
+                title: '🔥 Поздравляем!',
+                body: `Вы поддерживаете связь уже ${newStreak} дней подряд! Так держать! 💪`,
+                data: { code: code, type: 'streak', days: newStreak }
+              }]);
+            }
+          }
+          console.log(`🔥 Streak milestone: ${newStreak} days`);
+        }
+      }
 
       io.to(pairSockets[socket.id]).emit('ritual-updated', updatedPair);
     } catch (error) {
@@ -94,7 +162,7 @@ io.on('connection', (socket) => {
       const diaryEntry = { id: Date.now().toString(), by: user, text, createdAt: new Date().toISOString() };
       const updatedDiary = [...(pair.diary || []), diaryEntry];
 
-      const { data: updatedPair, error: updateError } = await supabase
+      const {  updatedPair, error: updateError } = await supabase
         .from('pairs')
         .update({ diary: updatedDiary, updated_at: new Date().toISOString() })
         .eq('code', code)
@@ -104,6 +172,25 @@ io.on('connection', (socket) => {
       if (updateError) throw updateError;
 
       await supabase.from('diary').insert({ id: diaryEntry.id, pair_id: updatedPair.id, user_id: user, text });
+
+      const partner = user === 'M' ? 'Ж' : 'M';
+      const partnerToken = userPushTokens[code]?.[partner];
+      
+      if (partnerToken && Expo.isExpoPushToken(partnerToken)) {
+        try {
+          await expo.sendPushNotificationsAsync([{
+            to: partnerToken,
+            sound: 'default',
+            title: '📝 Новая запись в дневнике',
+            body: `${user} добавил(а) запись`,
+            data: { code: code, type: 'diary' }
+          }]);
+          console.log('🔔 Push sent: diary');
+        } catch (e) {
+          console.error('❌ Push error:', e);
+        }
+      }
+
       io.to(pairSockets[socket.id]).emit('diary-updated', updatedPair);
     } catch (error) {
       console.error('❌ [diary] Error:', error);
@@ -111,13 +198,14 @@ io.on('connection', (socket) => {
     }
   });
 
+  // ✅ КНОПКА МИР + PUSH
   socket.on('peace-request', async ({ code, user }) => {
     try {
       const { data: pair, error: fetchError } = await supabase.from('pairs').select('*').eq('code', code).single();
       if (fetchError) throw fetchError;
 
       const peaceData = { active: true, from: user, timestamp: new Date().toISOString() };
-      const { data: updatedPair, error: updateError } = await supabase
+      const {  updatedPair, error: updateError } = await supabase
         .from('pairs')
         .update({ peace: peaceData, updated_at: new Date().toISOString() })
         .eq('code', code)
@@ -125,7 +213,33 @@ io.on('connection', (socket) => {
         .single();
 
       if (updateError) throw updateError;
-      await supabase.from('peace').insert({ id: Date.now().toString(), pair_id: updatedPair.id, from_user: user, active: true });
+      
+      await supabase.from('peace').insert({ 
+        id: Date.now().toString(), 
+        pair_id: updatedPair.id, 
+        from_user: user, 
+        active: true 
+      });
+
+      // 🔔 ОТПРАВКА PUSH ПАРТНЁРУ
+      const partner = user === 'M' ? 'Ж' : 'M';
+      const partnerToken = userPushTokens[code]?.[partner];
+      
+      if (partnerToken && Expo.isExpoPushToken(partnerToken)) {
+        try {
+          await expo.sendPushNotificationsAsync([{
+            to: partnerToken,
+            sound: 'default',
+            title: '🤝 Сигнал мира',
+            body: 'Партнёр хочет помириться',
+            data: { code: code, type: 'peace' }
+          }]);
+          console.log('🔔 Push sent: peace request');
+        } catch (e) {
+          console.error('❌ Push error:', e);
+        }
+      }
+
       io.to(pairSockets[socket.id]).emit('peace-updated', updatedPair);
     } catch (error) {
       console.error('❌ [peace] Error:', error);
@@ -143,7 +257,7 @@ io.on('connection', (socket) => {
       const updatedQuiz = { ...currentQuiz, [quizField]: ans, question: currentQuiz.question || 'Daily Question' };
       const bothAnswered = updatedQuiz.ans_a && updatedQuiz.ans_b;
       
-      const { data: updatedPair, error: updateError } = await supabase
+      const {  updatedPair, error: updateError } = await supabase
         .from('pairs')
         .update({ quiz: { ...updatedQuiz, revealed: bothAnswered }, updated_at: new Date().toISOString() })
         .eq('code', code)
@@ -174,7 +288,6 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), supabase: SUPABASE_URL ? 'configured' : 'missing' });
 });
 
-// 🔒 Уникальная генерация кода с повторной попыткой при коллизии
 app.post('/api/pair/create', async (req, res) => {
   try {
     let code, data, error, attempts = 0;
@@ -188,7 +301,7 @@ app.post('/api/pair/create', async (req, res) => {
       data = result.data;
       error = result.error;
       attempts++;
-    } while (error?.code === '23505' && attempts < 5); // 23505 = unique_violation в PostgreSQL
+    } while (error?.code === '23505' && attempts < 5);
 
     if (error) throw error;
     res.json({ success: true, code, pairId: data.id });
@@ -201,7 +314,7 @@ app.post('/api/pair/create', async (req, res) => {
 app.post('/api/pair/join', async (req, res) => {
   try {
     const { code, userId } = req.body;
-    const { data: pair, error: fetchError } = await supabase.from('pairs').select('*').eq('code', code.toUpperCase()).single();
+    const {  pair, error: fetchError } = await supabase.from('pairs').select('*').eq('code', code.toUpperCase()).single();
     if (fetchError) throw fetchError;
     if (!pair) return res.status(404).json({ error: 'Pair not found' });
 
@@ -225,6 +338,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log('🚀 Server running on port', PORT);
   console.log('📡 Socket.IO ready');
+  console.log(' Push Notifications enabled');
   console.log('🗄️ Supabase:', SUPABASE_URL ? '✓ Connected' : '✗ Not configured');
 });
 

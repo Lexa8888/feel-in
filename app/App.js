@@ -2,16 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, Animated, Alert } from 'react-native';
 import io from 'socket.io-client';
 import axios from 'axios';
+import { ThemeProvider, useTheme } from './useTheme';
+import { registerForPushNotifications, scheduleDailyReminder, cancelDailyReminder } from './pushNotificationService';
 import './web.css';
 
 const SERVER_URL = 'https://feel-in.onrender.com';
-
-const COLORS = {
-  bg: '#0F0F1A', card: 'rgba(255,255,255,0.08)', cardBorder: 'rgba(255,255,255,0.15)',
-  primary: '#FF6B6B', secondary: '#4ECDC4', accent: '#FFE66D', text: '#FFFFFF',
-  textDim: '#A0A0B0', success: '#4CAF50', warning: '#FFB347', peace: '#2D4A3E',
-  danger: '#FF4444',
-};
 
 const TRANSLATIONS = {
   ru: {
@@ -54,6 +49,7 @@ const TRANSLATIONS = {
     language: '🌐 Язык', russian: 'Русский', english: 'English',
     leavePair: '🚪 Выйти из пары', confirmLeave: 'Точно выйти из пары?',
     selectRole: '⚠️ Выбери роль (М или Ж)',
+    theme: '🌓 Тема',
   },
   en: {
     appName: 'Feel in', tagline: 'Feel each other from afar ✨',
@@ -95,6 +91,7 @@ const TRANSLATIONS = {
     language: '🌐 Language', russian: 'Русский', english: 'English',
     leavePair: '🚪 Leave Pair', confirmLeave: 'Are you sure you want to leave?',
     selectRole: '⚠️ Please select a role (M or F)',
+    theme: '🌓 Theme',
   },
 };
 
@@ -122,7 +119,6 @@ const getTodaysQuizQuestion = (lang) => {
   return QUIZ_QUESTIONS[lang][questionIndex];
 };
 
-// 🔔 Уведомления
 let toastContainer = null;
 const initToastContainer = () => {
   if (!toastContainer) {
@@ -153,11 +149,75 @@ const showNotification = (title, body) => {
   }, 3000);
 };
 
-export default function App() {
+function AppContent() {
+  const { theme, toggleTheme } = useTheme();
+  const COLORS = theme; 
+  
+  const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: COLORS.bg, minHeight: '100vh', width: '100%' },
+    scrollView: { flex: 1, width: '100%' },
+    header: { alignItems: 'center', marginBottom: 30, paddingTop: 50, width: '100%' },
+    headerSmall: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, width: '100%' },
+    langBtn: { padding: 10, borderRadius: 8, backgroundColor: COLORS.cardBorder, marginTop: 15 },
+    langBtnSmall: { padding: 8, borderRadius: 8, backgroundColor: COLORS.cardBorder },
+    leaveBtn: { padding: 8, borderRadius: 8, backgroundColor: 'rgba(255,68,68,0.2)', borderWidth: 1, borderColor: '#FF4444' },
+    leaveText: { color: '#FF4444', fontSize: 12, fontWeight: '600' },
+    langText: { color: COLORS.text, fontSize: 14, fontWeight: '600' },
+    langTextSmall: { color: COLORS.text, fontSize: 12, fontWeight: '600' },
+    logo: { fontSize: 48, fontWeight: '900', color: COLORS.text, textAlign: 'center', letterSpacing: 3, marginBottom: 10 },
+    subtitle: { fontSize: 16, color: COLORS.textDim, textAlign: 'center', marginTop: 8 },
+    footer: { textAlign: 'center', color: COLORS.textDim, marginTop: 30, fontSize: 14, paddingBottom: 20 },
+    card: { backgroundColor: COLORS.card, padding: 20, borderRadius: 20, borderWidth: 1, borderColor: COLORS.cardBorder, width: '100%' },
+    cardText: { color: COLORS.text, fontSize: 16, marginBottom: 15, lineHeight: 22 },
+    section: { marginBottom: 25, paddingHorizontal: 20, width: '100%', alignItems: 'center' },
+    sectionTitle: { fontSize: 20, fontWeight: '700', color: COLORS.text, marginBottom: 12, width: '100%' },
+    
+    button: { paddingVertical: 16, paddingHorizontal: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center', minWidth: 280, width: '100%' },
+    buttonText: { color: '#fff', fontWeight: '700', fontSize: 16, textAlign: 'center' },
+    buttonDisabled: { opacity: 0.5 },
+    
+    btnPrimary: { backgroundColor: '#FF6B6B' },
+    btnSecondary: { backgroundColor: '#4ECDC4' },
+    btnSuccess: { backgroundColor: '#4CAF50' },
+    btnAccent: { backgroundColor: '#FFE66D' },
+    btnPeace: { backgroundColor: '#2D4A3E' },
+    
+    input: { backgroundColor: COLORS.inputBg, borderWidth: 1, borderColor: COLORS.cardBorder,
+      padding: 16, borderRadius: 12, color: COLORS.text, fontSize: 16, marginBottom: 12, width: '100%' },
+    statusGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10, width: '100%' },
+    statusBtn: { alignItems: 'center', flex: 1, padding: 12, marginHorizontal: 4, borderRadius: 12, backgroundColor: COLORS.cardBorder },
+    statusEmoji: { fontSize: 36, marginBottom: 4, fontWeight: '700' },
+    statusLabel: { color: COLORS.textDim, fontSize: 11, textAlign: 'center' },
+    statusCard: { backgroundColor: COLORS.card, padding: 15, borderRadius: 12, borderWidth: 1, borderColor: COLORS.cardBorder, width: '100%' },
+    statusHint: { color: COLORS.textDim, fontSize: 14, marginVertical: 5 },
+    divider: { color: COLORS.textDim, marginVertical: 15, textAlign: 'center', fontSize: 14 },
+    roleSelector: { flexDirection: 'row', gap: 10, marginBottom: 12, width: '100%' },
+    roleBtn: { flex: 1, padding: 12, borderRadius: 10, backgroundColor: COLORS.cardBorder, alignItems: 'center', borderWidth: 1, borderColor: COLORS.cardBorder },
+    roleBtnActive: { backgroundColor: '#FF6B6B', borderColor: '#FF6B6B' },
+    roleText: { color: COLORS.textDim, fontSize: 13 },
+    roleTextActive: { color: '#fff', fontWeight: '700' },
+    streakBadge: { backgroundColor: 'rgba(255,179,71,0.15)', padding: 10, borderRadius: 10, alignItems: 'center', marginTop: 12, borderWidth: 1, borderColor: 'rgba(255,179,71,0.3)', width: '100%' },
+    streakText: { color: '#FFB347', fontWeight: '700', fontSize: 14 },
+    ritualCompleted: { backgroundColor: 'rgba(76,175,80,0.15)', padding: 15, borderRadius: 12, alignItems: 'center', marginBottom: 12, borderWidth: 1, borderColor: 'rgba(76,175,80,0.3)', width: '100%' },
+    ritualCompletedText: { color: '#4CAF50', fontWeight: '700', fontSize: 15 },
+    peaceNotification: { backgroundColor: 'rgba(76,175,80,0.15)', padding: 12, borderRadius: 10, marginTop: 10, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(76,175,80,0.3)', width: '100%' },
+    peaceText: { color: '#4CAF50', fontWeight: '700', fontSize: 15 },
+    peaceSubtext: { color: COLORS.textDim, fontSize: 12, marginTop: 2 },
+    diaryList: { marginTop: 12, width: '100%' },
+    diaryItem: { backgroundColor: 'rgba(78,205,196,0.15)', padding: 12, borderRadius: 10, marginBottom: 8, borderLeftWidth: 3, borderLeftColor: '#4ECDC4', width: '100%' },
+    diaryBy: { color: '#FFE66D', fontSize: 12, marginBottom: 4, fontWeight: '600' },
+    diaryText: { color: COLORS.text, fontSize: 14 },
+    emptyText: { color: COLORS.textDim, textAlign: 'center', fontStyle: 'italic', padding: 25, fontSize: 15 },
+    quizOptions: { flexDirection: 'row', gap: 10, marginTop: 10, width: '100%' },
+    quizBtn: { flex: 1, backgroundColor: COLORS.cardBorder, padding: 12, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: COLORS.cardBorder },
+    quizResult: { alignItems: 'center', marginTop: 10, width: '100%' },
+    quizResultText: { color: '#FFE66D', fontWeight: '700', fontSize: 16 },
+    quizMatch: { color: COLORS.text, marginTop: 5, textAlign: 'center' },
+    quizWaiting: { color: COLORS.textDim, textAlign: 'center', marginTop: 10, fontStyle: 'italic', fontSize: 14 },
+  });
+
   const [lang, setLang] = useState(() => localStorage.getItem('feelIn_lang') || 'ru');
   const t = TRANSLATIONS[lang];
-  
-  // 💾 Восстановление сессии из localStorage
   const [screen, setScreen] = useState(() => localStorage.getItem('feelIn_screen') || 'pairing');
   const [pairCode, setPairCode] = useState(() => localStorage.getItem('feelIn_pairCode') || '');
   const [userId, setUserId] = useState(() => localStorage.getItem('feelIn_userId') || '');
@@ -185,7 +245,6 @@ export default function App() {
     ]).start();
   }, []);
 
-  // 💾 Сохранение сессии при изменении состояния
   useEffect(() => {
     if (screen === 'home' && pairCode && userId) {
       localStorage.setItem('feelIn_screen', 'home');
@@ -200,18 +259,42 @@ export default function App() {
     }
   }, [screen, pairCode, userId, data]);
 
-  // 🔌 Инициализация сокетов
   useEffect(() => {
     const newSocket = io(SERVER_URL);
     setSocket(newSocket);
     
-    // Если восстановлена сессия, сразу присоединяемся к комнате пары
     if (screen === 'home' && data?.id) {
       newSocket.emit('join-pair', data.id);
     }
 
     return () => newSocket.disconnect();
   }, []);
+
+  // 🔔 Push Notifications
+  useEffect(() => {
+    const initNotifications = async () => {
+      const pushToken = await registerForPushNotifications();
+      
+      if (pushToken && userId) {
+        socket?.emit('register-push-token', { 
+          user: userId, 
+          token: pushToken,
+          pairCode: pairCode || data?.code 
+        });
+        console.log('📤 Push token sent to server');
+      }
+
+      if (screen === 'home') {
+        await scheduleDailyReminder(20, 0);
+      }
+    };
+
+    initNotifications();
+    
+    return () => {
+      cancelDailyReminder();
+    };
+  }, [socket, userId, pairCode, data, screen]);
 
   useEffect(() => {
     if (data) {
@@ -252,7 +335,6 @@ export default function App() {
     };
   }, [socket, t, userId]);
 
-  // 🚪 Выход из пары
   const leavePair = () => {
     Alert.alert(t.attention, t.confirmLeave, [
       { text: 'Отмена', style: 'cancel' },
@@ -269,7 +351,6 @@ export default function App() {
           setRitualDone(false);
           setHasAnsweredQuiz(false);
           setQuizAnswer(null);
-          // Переподключаем сокет
           const newSocket = io(SERVER_URL);
           setSocket(newSocket);
         }
@@ -390,9 +471,14 @@ export default function App() {
         <View style={styles.header}>
           <Text style={styles.logo}>💕 {t.appName}</Text>
           <Text style={styles.subtitle}>{t.tagline}</Text>
-          <TouchableOpacity onPress={toggleLanguage} style={styles.langBtn}>
-            <Text style={styles.langText}>{t.language}: {lang === 'ru' ? t.english : t.russian}</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity onPress={toggleLanguage} style={styles.langBtn}>
+              <Text style={styles.langText}>{t.language}: {lang === 'ru' ? t.english : t.russian}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={toggleTheme} style={styles.langBtn}>
+              <Text style={styles.langText}>{t.theme}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
         <View style={styles.card}>
           <AnimatedButton onPress={createPair} title={loading ? t.loading : t.createPair} gradient="btnPrimary" disabled={loading} />
@@ -423,9 +509,14 @@ export default function App() {
           <TouchableOpacity onPress={toggleLanguage} style={styles.langBtnSmall}>
             <Text style={styles.langTextSmall}>{lang === 'ru' ? '🇷 RU' : ' EN'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={leavePair} style={styles.leaveBtn}>
-            <Text style={styles.leaveText}>{t.leavePair}</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity onPress={toggleTheme} style={styles.langBtnSmall}>
+              <Text style={styles.langTextSmall}>🌓</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={leavePair} style={styles.leaveBtn}>
+              <Text style={styles.leaveText}>{t.leavePair}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -536,65 +627,10 @@ export default function App() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'transparent', minHeight: '100vh', width: '100%' },
-  scrollView: { flex: 1, width: '100%' },
-  header: { alignItems: 'center', marginBottom: 30, paddingTop: 50, width: '100%' },
-  headerSmall: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, width: '100%' },
-  langBtn: { padding: 10, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.1)', marginTop: 15 },
-  langBtnSmall: { padding: 8, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.1)' },
-  leaveBtn: { padding: 8, borderRadius: 8, backgroundColor: 'rgba(255,68,68,0.2)', borderWidth: 1, borderColor: COLORS.danger },
-  leaveText: { color: COLORS.danger, fontSize: 12, fontWeight: '600' },
-  langText: { color: COLORS.text, fontSize: 14, fontWeight: '600' },
-  langTextSmall: { color: COLORS.text, fontSize: 12, fontWeight: '600' },
-  logo: { fontSize: 48, fontWeight: '900', color: '#FFFFFF', textAlign: 'center', letterSpacing: 3, marginBottom: 10 },
-  subtitle: { fontSize: 16, color: COLORS.textDim, textAlign: 'center', marginTop: 8 },
-  footer: { textAlign: 'center', color: COLORS.textDim, marginTop: 30, fontSize: 14, paddingBottom: 20 },
-  card: { backgroundColor: COLORS.card, padding: 20, borderRadius: 20, borderWidth: 1, borderColor: COLORS.cardBorder, width: '100%' },
-  cardText: { color: COLORS.text, fontSize: 16, marginBottom: 15, lineHeight: 22 },
-  section: { marginBottom: 25, paddingHorizontal: 20, width: '100%', alignItems: 'center' },
-  sectionTitle: { fontSize: 20, fontWeight: '700', color: COLORS.text, marginBottom: 12, width: '100%' },
-  
-  button: { paddingVertical: 16, paddingHorizontal: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center', minWidth: 280, width: '100%' },
-  buttonText: { color: '#fff', fontWeight: '700', fontSize: 16, textAlign: 'center' },
-  buttonDisabled: { opacity: 0.5 },
-  
-  btnPrimary: { backgroundColor: '#FF6B6B' },
-  btnSecondary: { backgroundColor: '#4ECDC4' },
-  btnSuccess: { backgroundColor: '#4CAF50' },
-  btnAccent: { backgroundColor: '#FFE66D' },
-  btnPeace: { backgroundColor: '#2D4A3E' },
-  
-  input: { backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: COLORS.cardBorder,
-    padding: 16, borderRadius: 12, color: COLORS.text, fontSize: 16, marginBottom: 12, width: '100%' },
-  statusGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10, width: '100%' },
-  statusBtn: { alignItems: 'center', flex: 1, padding: 12, marginHorizontal: 4, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)' },
-  statusEmoji: { fontSize: 36, marginBottom: 4, fontWeight: '700' },
-  statusLabel: { color: COLORS.textDim, fontSize: 11, textAlign: 'center' },
-  statusCard: { backgroundColor: COLORS.card, padding: 15, borderRadius: 12, borderWidth: 1, borderColor: COLORS.cardBorder, width: '100%' },
-  statusHint: { color: COLORS.textDim, fontSize: 14, marginVertical: 5 },
-  divider: { color: COLORS.textDim, marginVertical: 15, textAlign: 'center', fontSize: 14 },
-  roleSelector: { flexDirection: 'row', gap: 10, marginBottom: 12, width: '100%' },
-  roleBtn: { flex: 1, padding: 12, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', borderWidth: 1, borderColor: COLORS.cardBorder },
-  roleBtnActive: { backgroundColor: '#FF6B6B', borderColor: '#FF6B6B' },
-  roleText: { color: COLORS.textDim, fontSize: 13 },
-  roleTextActive: { color: '#fff', fontWeight: '700' },
-  streakBadge: { backgroundColor: 'rgba(255,179,71,0.15)', padding: 10, borderRadius: 10, alignItems: 'center', marginTop: 12, borderWidth: 1, borderColor: 'rgba(255,179,71,0.3)', width: '100%' },
-  streakText: { color: '#FFB347', fontWeight: '700', fontSize: 14 },
-  ritualCompleted: { backgroundColor: 'rgba(76,175,80,0.15)', padding: 15, borderRadius: 12, alignItems: 'center', marginBottom: 12, borderWidth: 1, borderColor: 'rgba(76,175,80,0.3)', width: '100%' },
-  ritualCompletedText: { color: '#4CAF50', fontWeight: '700', fontSize: 15 },
-  peaceNotification: { backgroundColor: 'rgba(76,175,80,0.15)', padding: 12, borderRadius: 10, marginTop: 10, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(76,175,80,0.3)', width: '100%' },
-  peaceText: { color: '#4CAF50', fontWeight: '700', fontSize: 15 },
-  peaceSubtext: { color: COLORS.textDim, fontSize: 12, marginTop: 2 },
-  diaryList: { marginTop: 12, width: '100%' },
-  diaryItem: { backgroundColor: 'rgba(78,205,196,0.15)', padding: 12, borderRadius: 10, marginBottom: 8, borderLeftWidth: 3, borderLeftColor: '#4ECDC4', width: '100%' },
-  diaryBy: { color: '#FFE66D', fontSize: 12, marginBottom: 4, fontWeight: '600' },
-  diaryText: { color: '#FFFFFF', fontSize: 14 },
-  emptyText: { color: 'rgba(255, 255, 255, 0.75)', textAlign: 'center', fontStyle: 'italic', padding: 25, fontSize: 15 },
-  quizOptions: { flexDirection: 'row', gap: 10, marginTop: 10, width: '100%' },
-  quizBtn: { flex: 1, backgroundColor: 'rgba(255,255,255,0.1)', padding: 12, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: COLORS.cardBorder },
-  quizResult: { alignItems: 'center', marginTop: 10, width: '100%' },
-  quizResultText: { color: '#FFE66D', fontWeight: '700', fontSize: 16 },
-  quizMatch: { color: COLORS.text, marginTop: 5, textAlign: 'center' },
-  quizWaiting: { color: 'rgba(255, 255, 255, 0.6)', textAlign: 'center', marginTop: 10, fontStyle: 'italic', fontSize: 14 },
-});
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
+  );
+}

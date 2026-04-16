@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#121212"
+      "backgroundColor": "#0F0F1A"
     },
     "updates": {
       "fallbackToCacheTimeout": 0
@@ -21,7 +21,8 @@
       "bundleIdentifier": "com.feelin.app"
     },
     "android": {
-      "package": "com.feelin.app"
+      "package": "com.feelin.app",
+      "permissions": ["POST_NOTIFICATIONS"]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -30,6 +31,9 @@
       "eas": {
         "projectId": "0636e412-9635-4a63-a35d-bf97572f3861"
       }
-    }
+    },
+    "plugins": [
+      "expo-notifications"
+    ]
   }
 }

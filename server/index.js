@@ -44,10 +44,12 @@ io.on('connection', (socket) => {
     pairSockets[socket.id] = pairId;
   });
 
+  // ✅ ОБНОВЛЕНИЕ СТАТУСА
   socket.on('update-status', async ({ code, user, value }) => {
     console.log('📥 [status] Received:', { code, user, value });
     try {
-      const { data: pair, error: fetchError } = await supabase
+      // Находим пару
+      const {  pair, error: fetchError } = await supabase
         .from('pairs')
         .select('*')
         .eq('code', code)
@@ -58,12 +60,18 @@ io.on('connection', (socket) => {
         throw fetchError;
       }
 
+      // Определяем какое поле обновлять
       const updateField = user === 'M' ? 'status_a' : 'status_b';
+      
+      // Обновляем статус
       const { data: updatedPair, error: updateError } = await supabase
         .from('pairs')
-        .update({ [updateField]: value, updated_at: new Date().toISOString() })
+        .update({ 
+          [updateField]: value,
+          updated_at: new Date().toISOString()
+        })
         .eq('code', code)
-        .select()
+        .select('*')  // ✅ ВАЖНО: возвращаем все поля
         .single();
 
       if (updateError) {
@@ -71,45 +79,64 @@ io.on('connection', (socket) => {
         throw updateError;
       }
 
-      console.log('✅ [status] Updated successfully');
+      console.log('✅ [status] Updated:', updatedPair);
       io.to(pairSockets[socket.id]).emit('status-updated', updatedPair);
     } catch (error) {
-      console.error('❌ [status] Error:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code
-      });
+      console.error('❌ [status] Error:', error);
       socket.emit('error', { event: 'update-status', message: error.message });
     }
   });
 
+  // ✅ ВЫПОЛНЕНИЕ РИТУАЛА (с увеличением streak)
   socket.on('complete-ritual', async ({ code, user, text }) => {
-    console.log('📥 [ritual] Received:', { code, user, text: text?.slice(0, 50) });
+    console.log('📥 [ritual] Received:', { code, user, text: text?.slice(0, 30) });
     try {
-      const { data: pair, error: fetchError } = await supabase
+      // Находим пару
+      const {  pair, error: fetchError } = await supabase
         .from('pairs')
         .select('*')
         .eq('code', code)
         .single();
 
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        console.error('❌ [ritual] Fetch error:', fetchError);
+        throw fetchError;
+      }
 
+      // Определяем поле
       const ritualField = user === 'M' ? 'ritual_a' : 'ritual_b';
+      
+      // Проверяем, выполнял ли уже сегодня
+      const today = new Date().toISOString().split('T')[0];
+      if (pair.last_ritual === today) {
+        console.log('⚠️ [ritual] Already completed today');
+        return;
+      }
+
+      // ✅ Увеличиваем streak ТОЛЬКО если оба выполнили ритуал
+      const otherRitualField = user === 'M' ? 'ritual_b' : 'ritual_a';
+      const otherPartnerDone = pair[otherRitualField];
+      const newStreak = otherPartnerDone ? (pair.streak || 0) + 1 : (pair.streak || 0);
+
+      // Обновляем пару
       const { data: updatedPair, error: updateError } = await supabase
         .from('pairs')
         .update({ 
           [ritualField]: text,
-          last_ritual: new Date().toISOString().split('T')[0],
-          streak: (pair.streak || 0) + 1,
+          last_ritual: today,
+          streak: newStreak,
           updated_at: new Date().toISOString()
         })
         .eq('code', code)
-        .select()
+        .select('*')  // ✅ Возвращаем обновленные данные
         .single();
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('❌ [ritual] Update error:', updateError);
+        throw updateError;
+      }
 
+      // Сохраняем в отдельную таблицу
       await supabase
         .from('rituals')
         .insert({
@@ -121,22 +148,19 @@ io.on('connection', (socket) => {
           completed_at: new Date().toISOString()
         });
 
-      console.log('✅ [ritual] Updated successfully');
+      console.log('✅ [ritual] Updated, streak:', newStreak);
       io.to(pairSockets[socket.id]).emit('ritual-updated', updatedPair);
     } catch (error) {
-      console.error('❌ [ritual] Error:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint
-      });
+      console.error('❌ [ritual] Error:', error);
       socket.emit('error', { event: 'complete-ritual', message: error.message });
     }
   });
 
+  // ✅ ДОБАВЛЕНИЕ В ДНЕВНИК
   socket.on('add-diary', async ({ code, user, text }) => {
-    console.log('📥 [diary] Received:', { code, user, text: text?.slice(0, 50) });
+    console.log('📥 [diary] Received:', { code, user, text: text?.slice(0, 30) });
     try {
-      const { data: pair, error: fetchError } = await supabase
+      const {  pair, error: fetchError } = await supabase
         .from('pairs')
         .select('*')
         .eq('code', code)
@@ -153,11 +177,14 @@ io.on('connection', (socket) => {
 
       const updatedDiary = [...(pair.diary || []), diaryEntry];
 
-      const { data: updatedPair, error: updateError } = await supabase
+      const {  updatedPair, error: updateError } = await supabase
         .from('pairs')
-        .update({ diary: updatedDiary, updated_at: new Date().toISOString() })
+        .update({ 
+          diary: updatedDiary,
+          updated_at: new Date().toISOString()
+        })
         .eq('code', code)
-        .select()
+        .select('*')
         .single();
 
       if (updateError) throw updateError;
@@ -171,22 +198,19 @@ io.on('connection', (socket) => {
           text: text
         });
 
-      console.log('✅ [diary] Updated successfully');
+      console.log('✅ [diary] Updated');
       io.to(pairSockets[socket.id]).emit('diary-updated', updatedPair);
     } catch (error) {
-      console.error('❌ [diary] Error:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint
-      });
+      console.error('❌ [diary] Error:', error);
       socket.emit('error', { event: 'add-diary', message: error.message });
     }
   });
 
+  // ✅ КНОПКА МИР
   socket.on('peace-request', async ({ code, user }) => {
     console.log('📥 [peace] Received:', { code, user });
     try {
-      const { data: pair, error: fetchError } = await supabase
+      const {  pair, error: fetchError } = await supabase
         .from('pairs')
         .select('*')
         .eq('code', code)
@@ -200,11 +224,14 @@ io.on('connection', (socket) => {
         timestamp: new Date().toISOString()
       };
 
-      const { data: updatedPair, error: updateError } = await supabase
+      const {  updatedPair, error: updateError } = await supabase
         .from('pairs')
-        .update({ peace: peaceData, updated_at: new Date().toISOString() })
+        .update({ 
+          peace: peaceData,
+          updated_at: new Date().toISOString()
+        })
         .eq('code', code)
-        .select()
+        .select('*')
         .single();
 
       if (updateError) throw updateError;
@@ -218,22 +245,19 @@ io.on('connection', (socket) => {
           active: true
         });
 
-      console.log('✅ [peace] Updated successfully');
+      console.log('✅ [peace] Updated');
       io.to(pairSockets[socket.id]).emit('peace-updated', updatedPair);
     } catch (error) {
-      console.error('❌ [peace] Error:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint
-      });
+      console.error('❌ [peace] Error:', error);
       socket.emit('error', { event: 'peace-request', message: error.message });
     }
   });
 
+  // ✅ ВИКТОРИНА
   socket.on('quiz-submit', async ({ code, user, ans }) => {
     console.log('📥 [quiz] Received:', { code, user, ans });
     try {
-      const { data: pair, error: fetchError } = await supabase
+      const {  pair, error: fetchError } = await supabase
         .from('pairs')
         .select('*')
         .eq('code', code)
@@ -243,17 +267,25 @@ io.on('connection', (socket) => {
 
       const quizField = user === 'M' ? 'ans_a' : 'ans_b';
       const currentQuiz = pair.quiz || {};
-      const updatedQuiz = { ...currentQuiz, [quizField]: ans };
+      const updatedQuiz = { 
+        ...currentQuiz, 
+        [quizField]: ans,
+        question: currentQuiz.question || 'Today\'s Question'
+      };
+      
       const bothAnswered = updatedQuiz.ans_a && updatedQuiz.ans_b;
       
-      const { data: updatedPair, error: updateError } = await supabase
+      const {  updatedPair, error: updateError } = await supabase
         .from('pairs')
         .update({ 
-          quiz: { ...updatedQuiz, revealed: bothAnswered },
+          quiz: { 
+            ...updatedQuiz, 
+            revealed: bothAnswered 
+          },
           updated_at: new Date().toISOString()
         })
         .eq('code', code)
-        .select()
+        .select('*')
         .single();
 
       if (updateError) throw updateError;
@@ -271,14 +303,10 @@ io.on('connection', (socket) => {
           });
       }
 
-      console.log('✅ [quiz] Updated successfully');
+      console.log('✅ [quiz] Updated, both answered:', bothAnswered);
       io.to(pairSockets[socket.id]).emit('quiz-updated', updatedPair);
     } catch (error) {
-      console.error('❌ [quiz] Error:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint
-      });
+      console.error('❌ [quiz] Error:', error);
       socket.emit('error', { event: 'quiz-submit', message: error.message });
     }
   });
@@ -303,12 +331,8 @@ app.get('/api/health', (req, res) => {
 
 app.post('/api/pair/create', async (req, res) => {
   console.log('📥 [API] POST /api/pair/create');
-  console.log('🔑 Using Supabase URL:', SUPABASE_URL);
-  
   try {
     const code = 'FEEL-' + Math.random().toString(36).substring(2, 6).toUpperCase();
-    
-    console.log('📝 Inserting into pairs:', { code, id: Date.now().toString() });
     
     const { data, error } = await supabase
       .from('pairs')
@@ -321,30 +345,13 @@ app.post('/api/pair/create', async (req, res) => {
       .select()
       .single();
 
-    if (error) {
-      console.error('❌ [API] Supabase insert error:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code
-      });
-      throw error;
-    }
+    if (error) throw error;
 
-    console.log('✅ [API] Pair created successfully:', { code, pairId: data.id });
+    console.log('✅ [API] Pair created:', { code, pairId: data.id });
     res.json({ success: true, code, pairId: data.id });
   } catch (error) {
-    console.error('❌ [API] Failed to create pair:', {
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-      code: error.code
-    });
-    res.status(500).json({ 
-      error: 'Failed to create pair', 
-      details: error.message,
-      hint: error.hint 
-    });
+    console.error('❌ [API] Failed to create pair:', error);
+    res.status(500).json({ error: 'Failed to create pair', details: error.message });
   }
 });
 
@@ -353,7 +360,7 @@ app.post('/api/pair/join', async (req, res) => {
   try {
     const { code, userId } = req.body;
     
-    const { data: pair, error: fetchError } = await supabase
+    const {  pair, error: fetchError } = await supabase
       .from('pairs')
       .select('*')
       .eq('code', code)
@@ -365,11 +372,14 @@ app.post('/api/pair/join', async (req, res) => {
     }
 
     const userField = userId === 'M' ? 'user_a' : 'user_b';
-    const { data: updatedPair, error: updateError } = await supabase
+    const {  updatedPair, error: updateError } = await supabase
       .from('pairs')
-      .update({ [userField]: userId || 'user', updated_at: new Date().toISOString() })
+      .update({ 
+        [userField]: userId || 'user', 
+        updated_at: new Date().toISOString() 
+      })
       .eq('code', code)
-      .select()
+      .select('*')
       .single();
 
     if (updateError) throw updateError;
@@ -377,16 +387,8 @@ app.post('/api/pair/join', async (req, res) => {
     console.log('✅ [API] Pair joined:', { code, pairId: pair.id });
     res.json({ success: true, pair: updatedPair, pairId: pair.id });
   } catch (error) {
-    console.error('❌ [API] Failed to join pair:', {
-      message: error.message,
-      details: error.details,
-      hint: error.hint
-    });
-    res.status(500).json({ 
-      error: 'Failed to join pair', 
-      details: error.message,
-      hint: error.hint 
-    });
+    console.error('❌ [API] Failed to join pair:', error);
+    res.status(500).json({ error: 'Failed to join pair', details: error.message });
   }
 });
 
@@ -395,11 +397,10 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('🚀 Server running on port', PORT);
   console.log('📡 Socket.IO ready');
   console.log('🗄️ Supabase:', SUPABASE_URL ? '✓ Connected' : '✗ Not configured');
-  console.log('🌍 Environment:', process.env.NODE_ENV || 'development');
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  console.error('❌ Unhandled Rejection:', reason);
 });
 
 process.on('uncaughtException', (error) => {

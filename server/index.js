@@ -23,7 +23,6 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// 🔑 Supabase client
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
@@ -294,7 +293,6 @@ io.on('connection', (socket) => {
   });
 });
 
-// REST API
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 

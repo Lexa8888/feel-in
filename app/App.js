@@ -182,7 +182,7 @@ export default function App() {
 
   useEffect(() => {
     if (data) {
-      const myRitualDone = userId === 'M' ? data?.ritualM : data?.ritualЖ;
+      const myRitualDone = userId === 'M' ? data?.ritual_a : data?.ritual_b;
       setRitualDone(!!myRitualDone);
     }
   }, [data, userId]);
@@ -209,8 +209,8 @@ export default function App() {
     
     const statusHandler = (newData) => {
       setData(newData);
-      if (userId === 'M') setMyStatus(newData?.statusM);
-      else setMyStatus(newData?.statusЖ);
+      if (userId === 'M') setMyStatus(newData?.status_a);
+      else setMyStatus(newData?.status_b);
     };
     socket.on('status-updated', statusHandler);
     
@@ -225,6 +225,9 @@ export default function App() {
       setLoading(true);
       const res = await axios.post(`${SERVER_URL}/api/pair/create`);
       setPairCode(res.data.code);
+      // ✅ Инициализируем data, чтобы приложение сразу знало код пары
+      setData({ code: res.data.code, id: res.data.pairId, streak: 0 });
+      setScreen('home'); // Переходим на главный экран
       showNotification(t.pairCreated, t.yourCode.replace('{code}', res.data.code));
     } catch (e) { 
       showNotification(t.error, t.checkInternet); 
@@ -247,43 +250,47 @@ export default function App() {
   };
 
   const updateStatus = (val) => {
+    const codeToSend = pairCode || data?.code;
+    if (!codeToSend) { showNotification(t.error, 'Код пары не найден'); return; }
+    
     setMyStatus(val);
-    socket?.emit('update-status', { code: data?.id, user: userId, value: val });
+    socket?.emit('update-status', { code: codeToSend, user: userId, value: val });
     showNotification(t.statusUpdated, t.yourMood.replace('{mood}', val));
   };
 
   const completeRitual = () => {
+    const codeToSend = pairCode || data?.code;
+    if (!codeToSend) { showNotification(t.error, 'Код пары не найден'); return; }
+    
     if (ritualDone) {
       showNotification(t.attention, 'Уже выполнено!');
       return;
     }
     if (!ritualText.trim()) { showNotification(t.attention, t.writeCompliment); return; }
     
-    console.log('❤️ Отправляем ритуал:', { code: data?.id, user: userId, text: ritualText });
-    socket?.emit('complete-ritual', { code: data?.id, user: userId, text: ritualText });
+    console.log('❤️ Отправляем ритуал:', { code: codeToSend, user: userId, text: ritualText });
+    socket?.emit('complete-ritual', { code: codeToSend, user: userId, text: ritualText });
     setRitualDone(true);
     setRitualText('');
     showNotification(t.ritualGreat, t.ritualComplete);
   };
 
   const addDiary = () => {
+    const codeToSend = pairCode || data?.code;
+    if (!codeToSend) { showNotification(t.error, 'Код пары не найден'); return; }
     if (!diaryText.trim()) {
       showNotification(t.attention, 'Напиши что-нибудь!');
       return;
     }
-    if (!data?.id) {
-      showNotification(t.error, 'Нет данных пары!');
-      return;
-    }
     
     const textToSend = diaryText;
-    console.log('📝 Отправляем запись:', { code: data?.id, user: userId, text: textToSend });
-    socket?.emit('add-diary', { code: data?.id, user: userId, text: textToSend });
+    console.log('📝 Отправляем запись:', { code: codeToSend, user: userId, text: textToSend });
+    socket?.emit('add-diary', { code: codeToSend, user: userId, text: textToSend });
     
     setData(prevData => ({
       ...prevData,
       diary: [...(prevData?.diary || []), {
-        id: Date.now(),
+        id: Date.now().toString(),
         by: userId,
         text: textToSend,
         createdAt: new Date().toISOString()
@@ -295,18 +302,24 @@ export default function App() {
   };
 
   const sendPeace = () => {
-    socket?.emit('peace-request', { code: data?.id, user: userId });
+    const codeToSend = pairCode || data?.code;
+    if (!codeToSend) { showNotification(t.error, 'Код пары не найден'); return; }
+    
+    socket?.emit('peace-request', { code: codeToSend, user: userId });
     showNotification(t.peaceSent, t.partnerNotified);
   };
 
   const submitQuiz = (ans) => {
+    const codeToSend = pairCode || data?.code;
+    if (!codeToSend) { showNotification(t.error, 'Код пары не найден'); return; }
+    
     if (hasAnsweredQuiz) {
       showNotification(t.attention, 'Уже ответили!');
       return;
     }
     setQuizAnswer(ans);
     setHasAnsweredQuiz(true);
-    socket?.emit('quiz-submit', { code: data?.id, user: userId, ans });
+    socket?.emit('quiz-submit', { code: codeToSend, user: userId, ans });
     showNotification(t.answerAccepted, t.waitingPartner);
   };
 
@@ -316,7 +329,6 @@ export default function App() {
     localStorage.setItem('feelIn_lang', newLang);
   };
 
-  // ✅ КНОПКА ПО ЦЕНТРУ (исправлено)
   const AnimatedButton = ({ onPress, title, gradient, disabled, icon }) => {
     const scaleAnimBtn = useRef(new Animated.Value(1)).current;
     const handlePressIn = () => Animated.spring(scaleAnimBtn, { toValue: 0.95, friction: 8, useNativeDriver: false }).start();
@@ -410,7 +422,7 @@ export default function App() {
           </View>
           <View style={styles.statusCard}>
             <Text style={styles.statusHint}>{t.my} <Text style={{ color: COLORS.primary }}>{myStatus || '-'}</Text></Text>
-            <Text style={styles.statusHint}>{t.partner} <Text style={{ color: COLORS.secondary }}>{userId === 'M' ? data?.statusЖ : data?.statusM}</Text></Text>
+            <Text style={styles.statusHint}>{t.partner} <Text style={{ color: COLORS.secondary }}>{userId === 'M' ? data?.status_b : data?.status_a}</Text></Text>
           </View>
         </View>
 
@@ -476,11 +488,11 @@ export default function App() {
             {data?.quiz?.revealed ? (
               <View style={styles.quizResult}>
                 <Text style={styles.quizResultText}>{t.quizAnswersOpen}</Text>
-                <Text style={styles.quizMatch}>{data.quiz.ansM === data.quiz.ansЖ ? t.quizMatch : t.quizNoMatch}</Text>
+                <Text style={styles.quizMatch}>{data.quiz.ans_a === data.quiz.ans_b ? t.quizMatch : t.quizNoMatch}</Text>
               </View>
             ) : hasAnsweredQuiz ? (
               <Text style={styles.quizWaiting}>{t.quizWaiting}</Text>
-            ) : !data?.quiz?.ansM && !data?.quiz?.ansЖ ? (
+            ) : !data?.quiz?.ans_a && !data?.quiz?.ans_b ? (
               <View style={styles.quizOptions}>
                 <TouchableOpacity style={styles.quizBtn} onPress={() => submitQuiz(todaysQuestion?.a1)}>
                   <Text style={styles.buttonText}>{todaysQuestion?.a1}</Text>

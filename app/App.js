@@ -24,8 +24,8 @@ const { width, height } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
 
 const translations = {
-  ru: { welcome: "Feel In", createPair: "✨ Создать пару", join: "🔑 Войти по коду", codeLabel: "Введите код пары", back: "← Назад", days: "Дней вместе", ritual: "Ритуал", messages: "Сообщения", mood: "😊 Настроение", chat: "💬 Чат", dates: "📅 Даты", achievements: "🏆 Достижения", ritualCard: "✨ Ритуал дня", peace: "🕊️ Мир", sleep: "🌙 Спокойной ночи", settings: "⚙️ Настройки", security: "🔐 Безопасность", notifications: "🔊 Уведомления", privacy: "🛡️ Приватность", export: "📥 Экспорт данных", delete: "🗑 Удалить аккаунт", theme: "🎨 Тема", language: "🌍 Язык", light: "Светлая", dark: "Тёмная", russian: "Русский", english: "English", quiz: "🎮 Вопрос дня", answer: "Ответить", waitPartner: "Ждём ответ партнёра...", revealed: "Ответы открыты!", haptic: "💓 Love", noMessages: "Начните общение прямо сейчас", typing: "печатает...", send: "➤", attach: "📷 Фото", gratitude: "За что вы благодарны сегодня?", writeThoughts: "Ваши мысли...", save: "💾 Сохранить", cancel: "Отмена", addDate: "+ Добавить дату", importCalendar: "📥 Импорт из календаря", noDates: "Пока нет важных дат", today: "Сегодня!", daysLeft: "дней осталось", profile: "👤 Профиль", nickname: "Ваш никнейм", color: "Цвет аватара", done: "Готово", protection: "Защита приложения", faceId: "Face ID / Touch ID", changePin: "🔑 Сменить PIN-код", sounds: "🔔 Звуки уведомлений", hideText: "🙈 Скрывать текст уведомлений", digest: "📊 Еженедельный дайджест", digestTitle: "Ваша неделя в Feel In", messagesSent: "Отправлено сообщений", avgPulse: "Средний пульс пары", streakDays: "Дней ритуала", datesUpcoming: "Ближайшие даты", exportDesc: "Скачать все данные в JSON", deleteDesc: "Удалить аккаунт и все данные", deleteConfirm: "Удалить аккаунт навсегда?", exportSuccess: "Данные сохранены", deleteSuccess: "Аккаунт удалён", importTitle: "Импорт из календаря", close: "Закрыть", noEvents: "Нет событий в календаре", nextDate: "Следующее событие", countdown: "через", weekReport: "Отчёт за неделю", moodImproved: "Настроение улучшилось", recommendations: "Рекомендации", streak: "Серия", matchStats: "Совпадения ответов", themeUnlocked: "Тема открыта!", progress: "История ритуалов", secret: "Секретная тема", joinPair: "Вступить в пару", createNewPair: "Создать новую пару", yourCode: "Ваш код пары", partner: "Партнёр", you: "Вы", online: "онлайн", offline: "офлайн" },
-  en: { welcome: "Feel In", createPair: "✨ Create Pair", join: "🔑 Join by Code", codeLabel: "Enter Pair Code", back: "← Back", days: "Days together", ritual: "Ritual", messages: "Messages", mood: "😊 Mood", chat: "💬 Chat", dates: "📅 Dates", achievements: "🏆 Achievements", ritualCard: "✨ Daily Ritual", peace: "🕊️ Peace", sleep: "🌙 Good night", settings: "⚙️ Settings", security: "🔐 Security", notifications: "🔊 Notifications", privacy: "🛡️ Privacy", export: "📥 Export Data", delete: "🗑 Delete Account", theme: "🎨 Theme", language: "🌍 Language", light: "Light", dark: "Dark", russian: "Russian", english: "English", quiz: "🎮 Daily Quiz", answer: "Answer", waitPartner: "Waiting for partner...", revealed: "Answers revealed!", haptic: "💓 Love", noMessages: "Start chatting now", typing: "typing...", send: "➤", attach: "📷 Photo", gratitude: "What are you grateful for?", writeThoughts: "Your thoughts...", save: "💾 Save", cancel: "Cancel", addDate: "+ Add Date", importCalendar: "📥 Import Calendar", noDates: "No dates yet", today: "Today!", daysLeft: "days left", profile: "👤 Profile", nickname: "Your Nickname", color: "Avatar Color", done: "Done", protection: "App Protection", faceId: "Face ID / Touch ID", changePin: "🔑 Change PIN", sounds: "🔔 Notification Sounds", hideText: "🙈 Hide Notification Text", digest: "📊 Weekly Digest", digestTitle: "Your Week in Feel In", messagesSent: "Messages sent", avgPulse: "Couple's avg pulse", streakDays: "Ritual streak", datesUpcoming: "Upcoming dates", exportDesc: "Download all data as JSON", deleteDesc: "Delete account and all data", deleteConfirm: "Delete account forever?", exportSuccess: "Data saved", deleteSuccess: "Account deleted", importTitle: "Import from Calendar", close: "Close", noEvents: "No calendar events", nextDate: "Next event", countdown: "in", weekReport: "Weekly Report", moodImproved: "Mood improved", recommendations: "Recommendations", streak: "Streak", matchStats: "Answer matches", themeUnlocked: "Theme unlocked!", progress: "Ritual history", secret: "Secret theme", joinPair: "Join Pair", createNewPair: "Create New Pair", yourCode: "Your pair code", partner: "Partner", you: "You", online: "online", offline: "offline" }
+  ru: { welcome: "Feel In", createPair: "✨ Создать пару", join: "🔑 Войти по коду", codeLabel: "Введите код пары", back: "← Назад", days: "Дней вместе", ritual: "Ритуал", messages: "Сообщения", mood: "😊 Настроение", chat: "💬 Чат", dates: "📅 Даты", achievements: "🏆 Достижения", ritualCard: "✨ Ритуал дня", peace: "🕊️ Мир", sleep: "🌙 Спокойной ночи", settings: "⚙️ Настройки", security: "🔐 Безопасность", notifications: "🔊 Уведомления", privacy: "🛡️ Приватность", export: "📥 Экспорт данных", delete: "🗑 Удалить аккаунт", theme: "🎨 Тема", language: "🌍 Язык", light: "Светлая", dark: "Тёмная", russian: "Русский", english: "English", quiz: "🎮 Вопрос дня", answer: "Ответить", waitPartner: "Ждём ответ партнёра...", revealed: "Ответы открыты!", haptic: "💓 Love", noMessages: "Начните общение прямо сейчас", typing: "печатает...", send: "➤", attach: "📷", gratitude: "За что вы благодарны сегодня?", writeThoughts: "Ваши мысли...", save: "💾 Сохранить", cancel: "Отмена", addDate: "+ Добавить дату", importCalendar: "📥 Импорт из календаря", noDates: "Пока нет важных дат", today: "Сегодня!", daysLeft: "дней осталось", profile: "👤 Профиль", nickname: "Ваш никнейм", color: "Цвет аватара", done: "Готово", protection: "Защита приложения", faceId: "Face ID / Touch ID", changePin: "🔑 Сменить PIN-код", sounds: "🔔 Звуки уведомлений", hideText: "🙈 Скрывать текст уведомлений", digest: "📊 Еженедельный дайджест", digestTitle: "Ваша неделя в Feel In", messagesSent: "Отправлено сообщений", avgPulse: "Средний пульс пары", streakDays: "Дней ритуала", datesUpcoming: "Ближайшие даты", exportDesc: "Скачать все данные в JSON", deleteDesc: "Удалить аккаунт и все данные", deleteConfirm: "Удалить аккаунт навсегда?", exportSuccess: "Данные сохранены", deleteSuccess: "Аккаунт удалён", importTitle: "Импорт из календаря", close: "Закрыть", noEvents: "Нет событий в календаре", nextDate: "Следующее событие", countdown: "через", weekReport: "Отчёт за неделю", moodImproved: "Настроение улучшилось", recommendations: "Рекомендации", streak: "Серия", matchStats: "Совпадения ответов", themeUnlocked: "Тема открыта!", progress: "История ритуалов", secret: "Секретная тема", joinPair: "Вступить в пару", createNewPair: "Создать новую пару", yourCode: "Ваш код пары", partner: "Партнёр", you: "Вы", online: "онлайн", offline: "офлайн", selectGender: "Выберите ваш пол", male: "👨 Мужской", female: "👩 Женский", continue: "Продолжить" },
+  en: { welcome: "Feel In", createPair: "✨ Create Pair", join: "🔑 Join by Code", codeLabel: "Enter Pair Code", back: "← Back", days: "Days together", ritual: "Ritual", messages: "Messages", mood: "😊 Mood", chat: "💬 Chat", dates: "📅 Dates", achievements: "🏆 Achievements", ritualCard: "✨ Daily Ritual", peace: "🕊️ Peace", sleep: "🌙 Good night", settings: "⚙️ Settings", security: "🔐 Security", notifications: "🔊 Notifications", privacy: "🛡️ Privacy", export: "📥 Export Data", delete: "🗑 Delete Account", theme: "🎨 Theme", language: "🌍 Language", light: "Light", dark: "Dark", russian: "Russian", english: "English", quiz: "🎮 Daily Quiz", answer: "Answer", waitPartner: "Waiting for partner...", revealed: "Answers revealed!", haptic: "💓 Love", noMessages: "Start chatting now", typing: "typing...", send: "➤", attach: "📷", gratitude: "What are you grateful for?", writeThoughts: "Your thoughts...", save: "💾 Save", cancel: "Cancel", addDate: "+ Add Date", importCalendar: "📥 Import Calendar", noDates: "No dates yet", today: "Today!", daysLeft: "days left", profile: "👤 Profile", nickname: "Your Nickname", color: "Avatar Color", done: "Done", protection: "App Protection", faceId: "Face ID / Touch ID", changePin: "🔑 Change PIN", sounds: "🔔 Notification Sounds", hideText: "🙈 Hide Notification Text", digest: "📊 Weekly Digest", digestTitle: "Your Week in Feel In", messagesSent: "Messages sent", avgPulse: "Couple's avg pulse", streakDays: "Ritual streak", datesUpcoming: "Upcoming dates", exportDesc: "Download all data as JSON", deleteDesc: "Delete account and all data", deleteConfirm: "Delete account forever?", exportSuccess: "Data saved", deleteSuccess: "Account deleted", importTitle: "Import from Calendar", close: "Close", noEvents: "No calendar events", nextDate: "Next event", countdown: "in", weekReport: "Weekly Report", moodImproved: "Mood improved", recommendations: "Recommendations", streak: "Streak", matchStats: "Answer matches", themeUnlocked: "Theme unlocked!", progress: "Ritual history", secret: "Secret theme", joinPair: "Join Pair", createNewPair: "Create New Pair", yourCode: "Your pair code", partner: "Partner", you: "You", online: "online", offline: "offline", selectGender: "Select your gender", male: "👨 Male", female: "👩 Female", continue: "Continue" }
 };
 
 const themes = {
@@ -177,6 +177,8 @@ function AppContent() {
   const [showThemeModal, setShowThemeModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [showGenderModal, setShowGenderModal] = useState(false);
+  const [pendingPairData, setPendingPairData] = useState(null);
   
   const colors = themes[themeMode];
   const t = useCallback((key) => translations[lang][key] || key, [lang]);
@@ -197,6 +199,15 @@ function AppContent() {
   const secureSet = async (key, val) => IS_WEB ? AsyncStorage.setItem(key, val) : SecureStore.setItemAsync(key, val);
   const secureDel = async (key) => IS_WEB ? AsyncStorage.removeItem(key) : SecureStore.deleteItemAsync(key);
   const triggerConfetti = useCallback(() => { setShowConfetti(true); setTimeout(() => setShowConfetti(false), 2500); }, []);
+
+  // ✅ АВТОСКРОЛЛ ЧАТА
+  useEffect(() => {
+    if (chatListRef.current && messages.length > 0) {
+      setTimeout(() => {
+        chatListRef.current.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [messages]);
 
   useEffect(() => {
     let isMounted = true;
@@ -358,10 +369,13 @@ function AppContent() {
       });
       
       newSocket.on('status-updated', (d) => {
-        console.log('😊 Status updated:', d);
-        if(!d) return;
-        if(d.user === 'M') setStatusA(d.value);
-        else setStatusB(d.value);
+        console.log('📡 Received status update:', d);
+        if (!d || !d.user) return;
+        if (d.user === 'M') {
+          setStatusA(d.value);
+        } else {
+          setStatusB(d.value);
+        }
       });
       
       newSocket.on('mood-history-loaded', (h) => {
@@ -438,7 +452,36 @@ function AppContent() {
   const importEvent = useCallback((event) => { const newDate = { id: Date.now().toString() + event.id, title: event.title, date: event.date }; setImportantDates(prev => { const updated = [...prev, newDate]; AsyncStorage.setItem('importantDates', JSON.stringify(updated)); return updated; }); setCalendarEvents(prev => prev.filter(e => e.id !== event.id)); if (!IS_WEB) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); }, []);
   const generateDigest = useCallback(async () => { const avgPulse = pulseScore > 0 ? pulseScore : Math.floor(Math.random() * 40) + 60; const upcomingDates = importantDates.filter(d => { const diff = Math.ceil((new Date(d.date) - new Date()) / 86400000); return diff >= 0 && diff <= 7; }).slice(0, 3); const prevDigest = await AsyncStorage.getItem('lastDigest'); let prevData = { pulse: 50, messages: 0 }; if (prevDigest) prevData = JSON.parse(prevDigest); setDigestData({ messages: totalMessages, pulse: avgPulse, streak, dates: upcomingDates, prevPulse: prevData.pulse, prevMessages: prevData.messages }); setShowDigest(true); await AsyncStorage.setItem('lastDigest', JSON.stringify({ pulse: avgPulse, messages: totalMessages })); }, [pulseScore, importantDates, totalMessages, streak]);
   const exportData = useCallback(async () => { try { const data = { pairCode, userRole, myNickname, partnerNickname, messages, importantDates, unlockedAchievements, stats: { daysTogether, streak, totalMessages, pulseScore }, exportedAt: new Date().toISOString() }; const uri = `${FileSystem.documentDirectory}feel-in-data.json`; await FileSystem.writeAsStringAsync(uri, JSON.stringify(data, null, 2)); await Share.share({ url: uri, title: 'Feel In Data' }); Alert.alert(t('exportSuccess')); } catch (e) { Alert.alert('Error', e.message); } }, [pairCode, userRole, myNickname, partnerNickname, messages, importantDates, unlockedAchievements, daysTogether, streak, totalMessages, pulseScore, t]);
-  const deleteAccount = useCallback(() => { Alert.alert(t('delete'), t('deleteConfirm'), [ { text: t('cancel'), style: 'cancel' }, { text: t('delete'), style: 'destructive', onPress: async () => { try { if (socketRef.current) socketRef.current.disconnect(); await fetch(`${CONFIG.SERVER_URL}/api/user/delete`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pairCode }) }); await AsyncStorage.clear(); setCurrentScreen('welcome'); Alert.alert(t('deleteSuccess')); } catch (e) { Alert.alert('Error', e.message); } } } ]); }, [t, pairCode]);
+  
+  // ✅ ИСПРАВЛЕНО: Удаление аккаунта
+  const deleteAccount = useCallback(() => { 
+    Alert.alert(
+      t('delete'), 
+      t('deleteConfirm'), 
+      [ 
+        { text: t('cancel'), style: 'cancel' }, 
+        { 
+          text: t('delete'), 
+          style: 'destructive', 
+          onPress: async () => { 
+            try { 
+              if (socketRef.current) socketRef.current.disconnect(); 
+              await fetch(`${CONFIG.SERVER_URL}/api/user/delete`, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ pairCode }) 
+              }); 
+              await AsyncStorage.clear(); 
+              setCurrentScreen('welcome'); 
+              Alert.alert(t('deleteSuccess')); 
+            } catch (e) { 
+              Alert.alert('Error', e.message); 
+            } 
+          } 
+        } 
+      ]
+    ); 
+  }, [t, pairCode]);
 
   const pickAndSendMedia = useCallback(async (type) => {
     if (!socketRef.current) return Alert.alert('Ошибка', 'Нет соединения с сервером');
@@ -488,6 +531,38 @@ function AppContent() {
   const submitQuiz = useCallback(() => { if(!quizInput.trim()||quizState.answered) return; socketRef.current.emit('quiz-submit', { code: pairCode, user: userRole, ans: quizInput }); const today = new Date().toDateString(); const newQuiz = { ...quizState, answered: true, myAns: quizInput, date: today }; setQuizState(newQuiz); AsyncStorage.setItem('dailyQuiz', JSON.stringify(newQuiz)); setQuizStreak(prev => { const newStreak = prev + 1; AsyncStorage.setItem('quizStreak', newStreak.toString()); return newStreak; }); setQuizInput(''); Alert.alert('Ответ сохранён! Ждём партнёра... 🤫'); }, [quizInput, quizState, socketRef, pairCode, userRole]);
   const unlockTheme = useCallback((themeKey) => { if (themeKey !== 'secret') return; if (unlockedAchievements.includes('secret_theme')) { setThemeMode('secret'); AsyncStorage.setItem('themeMode', 'secret'); Alert.alert(t('themeUnlocked')); setShowThemeModal(false); } }, [unlockedAchievements, t]);
 
+  // ✅ ВЫБОР ПОЛА ПРИ ВХОДЕ
+  const handleJoinWithGender = useCallback(async (gender) => {
+    if (!pendingPairData) return;
+    
+    setLoading(true);
+    try {
+      const r = await fetch(`${CONFIG.SERVER_URL}/api/pair/join`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({code: pendingPairData.code})
+      });
+      if(!r.ok) {
+        const errData = await r.json().catch(() => ({}));
+        throw new Error(errData.error || 'Server Error');
+      }
+      const d = await r.json();
+      setPairCode(d.pair.code);
+      setUserRole(gender);
+      setCurrentScreen('main');
+      await secureSet('pairData', JSON.stringify({pairCode: d.pair.code, userRole: gender, timestamp: Date.now()}));
+      connectSocket(d.pair.code);
+      setShowGenderModal(false);
+      setPendingPairData(null);
+    } catch(e) {
+      console.error(e);
+      if (typeof window !== 'undefined') window.alert('Ошибка входа: ' + e.message);
+      else Alert.alert('Ошибка', 'Не удалось войти. ' + e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [pendingPairData]);
+
   if(showPinScreen) return (<SafeAreaView style={[styles.safeArea,{backgroundColor:colors.bg}]}><View style={styles.pinContainer}><Text style={styles.pinIcon}>🔐</Text><Text style={[styles.pinTitle,{color:colors.text}]}>{t('protection')}</Text><View style={styles.pinInputContainer}>{[0,1,2,3].map(i => <View key={i} style={[styles.pinDot,{backgroundColor:pinInput.length>i?colors.primary:colors.bgCard}]}/>)}</View><TextInput style={styles.pinInputHidden} value={pinInput} onChangeText={setPinInput} keyboardType="number-pad" maxLength={4} autoFocus onSubmitEditing={()=>checkPin()}/><TouchableOpacity onPress={()=>setShowPinScreen(false)} style={{marginTop:30}}><Text style={[styles.pinCancel,{color:colors.textSecondary}]}>{t('cancel')}</Text></TouchableOpacity></View></SafeAreaView>);
   if(!isInitialized) return (<View style={[styles.loading,{backgroundColor:colors.bg}]}><ActivityIndicator size="large" color={colors.primary}/><Text style={[styles.loadingText,{color:colors.text}]}>Загрузка...</Text></View>);
   if(hasError) return (<View style={[styles.errorContainer,{backgroundColor:colors.bg}]}><Text style={styles.errorIcon}>😕</Text><Text style={[styles.errorTitle,{color:colors.text}]}>{t('welcome')}</Text><GradientButton onPress={()=>setHasError(false)} title="Перезапустить" colors={[colors.primary, '#ff6b9d']} /></View>);
@@ -525,30 +600,8 @@ function AppContent() {
                   cleanCode = 'FEEL-' + cleanCode.replace('FEEL-', '');
                 }
                 if(!cleanCode || cleanCode === 'FEEL-') return Alert.alert('Ошибка','Введите код пары');
-                setLoading(true);
-                try {
-                  const r = await fetch(`${CONFIG.SERVER_URL}/api/pair/join`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({code: cleanCode})
-                  });
-                  if(!r.ok) {
-                    const errData = await r.json().catch(() => ({}));
-                    throw new Error(errData.error || 'Server Error');
-                  }
-                  const d = await r.json();
-                  setPairCode(d.pair.code);
-                  setUserRole('Ж');
-                  setCurrentScreen('main');
-                  await secureSet('pairData', JSON.stringify({pairCode: d.pair.code, userRole: 'Ж', timestamp: Date.now()}));
-                  connectSocket(d.pair.code);
-                } catch(e) {
-                  console.error(e);
-                  if (typeof window !== 'undefined') window.alert('Ошибка входа: ' + e.message);
-                  else Alert.alert('Ошибка', 'Не удалось войти. ' + e.message);
-                } finally {
-                  setLoading(false);
-                }
+                setPendingPairData({code: cleanCode});
+                setShowGenderModal(true);
               }} title={loading?'...':t('join')} colors={[colors.secondary,'#48cae4']} disabled={loading}/>
             </View>
           </View>
@@ -572,6 +625,14 @@ function AppContent() {
                 <Animated.View style={{transform:[{scale:pulseAnim}]}}><LinearGradient colors={[getPulseColor(pulseScore),colors.primary]} style={styles.pulseHeartGradient}><Text style={styles.pulseHeart}>💓</Text></LinearGradient></Animated.View>
                 <Text style={[styles.pulseText,{color:colors.text}]}>{t('mood').split(' ')[0]}: <Text style={{color:getPulseColor(pulseScore),fontWeight:'800'}}>{pulseScore}%</Text></Text>
                 {pulseScore >= 100 && <Text style={{color:colors.warning,fontSize:12,marginTop:4}}>🎉 Идеальная синхронизация!</Text>}
+                
+                {/* ✅ ВИДЖЕТ ПЕРЕНЕСЕН В СЕРДЦЕ */}
+                {showHapticWidget && (
+                  <TouchableOpacity onPress={sendHapticLove} style={styles.hapticButtonInHeart}>
+                    <Text style={{fontSize: 28}}>💓</Text>
+                    <Text style={[styles.hapticButtonText, {color: colors.text}]}>Отправить любовь</Text>
+                  </TouchableOpacity>
+                )}
               </View>
               <LinearGradient colors={themeMode==='light'?['#f8f9fa','#ffffff']:['#1a1a35','#2d2d55']} style={styles.statCard}>
                 <View style={styles.statRow}>
@@ -601,7 +662,7 @@ function AppContent() {
                   {partnerTyping&&<Text style={[styles.typingText,{color:colors.textMuted}]}>✍️ {partnerTyping} {t('typing')}</Text>}
                 </View>)}
                 {!partnerSleeping&&<View style={styles.chatInputRow}>
-                  <TouchableOpacity onPress={()=>pickAndSendMedia('image')} style={[styles.attachBtn,{backgroundColor:colors.bgCard}]}><Text style={styles.attachText}>{t('attach')}</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={()=>pickAndSendMedia('image')} style={[styles.attachBtn,{backgroundColor:colors.bgCard}]}><Text style={[styles.attachText,{color: colors.textSecondary}]}>{t('attach')}</Text></TouchableOpacity>
                   <TextInput style={[styles.chatInput,{backgroundColor:colors.bg,color:colors.text,borderColor:colors.border}]} placeholder={t('chat')} placeholderTextColor={colors.textMuted} value={chatInput} onChangeText={handleChatInput} onSubmitEditing={sendMessage}/>
                   <TouchableOpacity style={styles.sendBtn} onPress={sendMessage}><LinearGradient colors={[colors.primary,'#ff6b9d']} style={styles.sendBtnGradient}><Text style={styles.sendText}>{t('send')}</Text></LinearGradient></TouchableOpacity>
                 </View>}
@@ -631,8 +692,30 @@ function AppContent() {
             </ScrollView>
           </View>
         )}
-        {currentScreen === 'main' && showHapticWidget && (<Animated.View style={[styles.floatingWidget, { transform: [{ translateX: pan.x }, { translateY: pan.y }, { scale: hapticScale }] }]} {...panResponder.panHandlers}><TouchableOpacity style={[styles.floatingBtn,{backgroundColor:colors.primary}]} onPress={sendHapticLove} activeOpacity={0.8} onLongPress={() => {if(!IS_WEB) Haptics.selectionAsync(); setShowHapticWidget(false);}}><Text style={{fontSize: 28}}>💓</Text></TouchableOpacity><TouchableOpacity style={styles.closeWidget} onPress={() => setShowHapticWidget(false)}><Text style={{color: '#fff', fontSize: 12}}>✕</Text></TouchableOpacity></Animated.View>)}
         {showReactions && (<Modal visible={true} transparent animationType="fade"><TouchableOpacity style={styles.modalOverlay} onPress={() => setShowReactions(null)}><View style={styles.reactionsPicker}>{['❤️','😂','','','',''].map(emoji => (<TouchableOpacity key={emoji} style={styles.reactionBtn} onPress={() => addReaction(showReactions, emoji)}><Text style={{fontSize:24}}>{emoji}</Text></TouchableOpacity>))}</View></TouchableOpacity></Modal>)}
+        
+        {/* ✅ МОДАЛКА ВЫБОРА ПОЛА */}
+        <Modal visible={showGenderModal} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.genderModalContent,{backgroundColor:colors.bgCard,borderColor:colors.border}]}>
+              <Text style={[styles.modalTitle,{color:colors.text}]}>{t('selectGender')}</Text>
+              <View style={styles.genderButtons}>
+                <TouchableOpacity onPress={() => handleJoinWithGender('M')} style={[styles.genderButton,{backgroundColor:colors.bg,borderColor:colors.border}]}>
+                  <Text style={{fontSize:48,marginBottom:12}}>👨</Text>
+                  <Text style={[styles.genderButtonText,{color:colors.text}]}>{t('male')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleJoinWithGender('Ж')} style={[styles.genderButton,{backgroundColor:colors.bg,borderColor:colors.border}]}>
+                  <Text style={{fontSize:48,marginBottom:12}}>👩</Text>
+                  <Text style={[styles.genderButtonText,{color:colors.text}]}>{t('female')}</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity onPress={()=>{setShowGenderModal(false);setPendingPairData(null);}} style={{marginTop:20}}>
+                <Text style={[{color:colors.textSecondary,textAlign:'center'}]}>{t('cancel')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+        
         <Modal visible={showCalendarImport} transparent animationType="slide"><View style={styles.modalOverlay}><View style={[styles.modalContent,{backgroundColor:colors.bgCard,borderColor:colors.border}]}>
           <Text style={[styles.modalTitle,{color:colors.text}]}>{t('importTitle')}</Text>
           <FlatList data={calendarEvents} keyExtractor={item => item.id} renderItem={({item}) => (<TouchableOpacity style={styles.calendarItem} onPress={() => importEvent(item)}><View style={{flex:1}}><Text style={[styles.calendarItemTitle,{color: colors.text}]} numberOfLines={2}>{item.title}</Text><Text style={{color: colors.textSecondary, fontSize: 12, marginTop: 4}}>{new Date(item.date).toLocaleDateString()} {item.isAllDay ? `(${t('today')})` : ''}</Text></View><Text style={{color: colors.success, fontSize: 22, fontWeight:'700'}}>+</Text></TouchableOpacity>)} ListEmptyComponent={<Text style={{color: colors.textMuted, textAlign: 'center', padding: 20}}>{t('noEvents')}</Text>} style={{maxHeight: 300, width: '100%'}}/>
@@ -792,7 +875,7 @@ const styles = StyleSheet.create({
   card:{borderRadius:20,padding:20,marginBottom:16,borderWidth:1},cardHeader:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:12},cardTitle:{fontSize:20,fontWeight:'700',marginBottom:12},addText:{fontSize:18,fontWeight:'600'},importBtn:{backgroundColor:'#1a1a35', paddingHorizontal:12, paddingVertical:8, borderRadius:10, borderWidth:1, borderColor:'#2a2a45'},importBtnText:{color:'#48cae4', fontSize:13, fontWeight:'600'},
   statusRow:{flexDirection:'row',justifyContent:'space-between',marginBottom:20},statusBadge:{flex:1,padding:16,borderRadius:16,borderWidth:1},statusText:{fontSize:13,fontWeight:'700',marginBottom:6},statusEmoji:{fontSize:32,textAlign:'center',marginVertical:6},statusDivider:{justifyContent:'center',paddingHorizontal:12},dividerDot:{fontSize:24},
   moodGrid:{flexDirection:'row',flexWrap:'wrap',gap:12},moodBtn:{width:(width-32-48-36)/4,aspectRatio:1,borderRadius:16,alignItems:'center',justifyContent:'center',borderWidth:2},moodEmoji:{fontSize:32},
-  chatBox:{height:280,marginBottom:12,borderRadius:16,padding:12,borderWidth:1},chatEmptyContainer:{flex:1,justifyContent:'center',alignItems:'center'},chatEmptyIcon:{fontSize:56,marginBottom:12},chatEmpty:{textAlign:'center',fontSize:16,fontWeight:'600'},msgBubble:{maxWidth:'85%',padding:14,borderRadius:18,marginBottom:10},msgMe:{backgroundColor:'#ff4d6d',alignSelf:'flex-end',borderBottomRightRadius:6},msgPartner:{backgroundColor:'#1a1a35',alignSelf:'flex-start',borderBottomLeftRadius:6},mediaImage:{width:150,height:150,borderRadius:12,marginBottom:8},msgNick:{fontSize:12,fontWeight:'700',marginBottom:4,opacity:0.8},msgText:{fontSize:15},msgTime:{fontSize:10},msgHeart:{fontSize:14},typingText:{fontSize:13,fontStyle:'italic',marginTop:8},chatInputRow:{flexDirection:'row',gap:10,marginTop:12,alignItems:'center'},attachBtn:{width:48,height:48,borderRadius:14,alignItems:'center',justifyContent:'center'},attachText:{fontSize:22},chatInput:{flex:1,padding:14,borderRadius:16,borderWidth:1,fontSize:15},sendBtn:{width:54,borderRadius:16,overflow:'hidden'},sendBtnGradient:{width:54,height:50,justifyContent:'center',alignItems:'center'},sendText:{color:'#fff',fontSize:22,fontWeight:'700'},
+  chatBox:{height:280,marginBottom:12,borderRadius:16,padding:12,borderWidth:1},chatEmptyContainer:{flex:1,justifyContent:'center',alignItems:'center'},chatEmptyIcon:{fontSize:56,marginBottom:12},chatEmpty:{textAlign:'center',fontSize:16,fontWeight:'600'},msgBubble:{maxWidth:'85%',padding:14,borderRadius:18,marginBottom:10},msgMe:{backgroundColor:'#ff4d6d',alignSelf:'flex-end',borderBottomRightRadius:6},msgPartner:{backgroundColor:'#1a1a35',alignSelf:'flex-start',borderBottomLeftRadius:6},mediaImage:{width:150,height:150,borderRadius:12,marginBottom:8},msgNick:{fontSize:12,fontWeight:'700',marginBottom:4,opacity:0.8},msgText:{fontSize:15},msgTime:{fontSize:10},msgHeart:{fontSize:14},typingText:{fontSize:13,fontStyle:'italic',marginTop:8},chatInputRow:{flexDirection:'row',gap:10,marginTop:12,alignItems:'center'},attachBtn:{width:48,height:48,borderRadius:14,alignItems:'center',justifyContent:'center'},attachText:{fontSize:16,fontWeight:'600'},chatInput:{flex:1,padding:14,borderRadius:16,borderWidth:1,fontSize:15},sendBtn:{width:54,borderRadius:16,overflow:'hidden'},sendBtnGradient:{width:54,height:50,justifyContent:'center',alignItems:'center'},sendText:{color:'#fff',fontSize:22,fontWeight:'700'},
   textArea:{padding:16,borderRadius:16,fontSize:15,minHeight:100,marginBottom:16,borderWidth:1},
   gradientButton:{paddingVertical:16,borderRadius:16,alignItems:'center',flexDirection:'row',justifyContent:'center'},buttonIcon:{fontSize:20,marginRight:8},buttonText:{color:'#fff',fontSize:18,fontWeight:'700'},actionButton:{borderRadius:20,overflow:'hidden',borderWidth:1},actionButtonGradient:{paddingVertical:20,alignItems:'center'},sleepBlock:{alignItems:'center',paddingVertical:40,borderRadius:16,marginBottom:12},sleepBlockTitle:{fontSize:22,fontWeight:'700',marginBottom:8},
   modalOverlay:{flex:1,backgroundColor:'rgba(0,0,0,0.85)',justifyContent:'center',alignItems:'center'},modalContent:{width:'85%',borderRadius:24,padding:28,borderWidth:1,maxHeight:'80%'},settingsContent:{width:'90%',borderRadius:24,padding:24,borderWidth:1,maxHeight:'90%'},settingsHeader:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:24},settingsTitle:{fontSize:26,fontWeight:'800'},settingSection:{marginBottom:24},settingSectionTitle:{fontSize:16,fontWeight:'700',marginBottom:12,textTransform:'uppercase'},settingItem:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',paddingVertical:12,borderBottomWidth:1,borderBottomColor:'#2a2a45'},settingInfo:{flex:1},settingLabel:{fontSize:16,fontWeight:'600'},settingButton:{padding:14,borderRadius:12,marginTop:12,alignItems:'center'},settingButtonText:{fontWeight:'600'},toggle:{width:52,height:32,borderRadius:16,backgroundColor:'#141428',padding:4,justifyContent:'center'},toggleCircle:{width:24,height:24,borderRadius:12},modalTitle:{fontSize:26,fontWeight:'800',marginBottom:24,textAlign:'center'},modalLabel:{fontSize:14,marginBottom:8,fontWeight:'600'},modalInput:{padding:14,borderRadius:16,marginBottom:20,borderWidth:1},datePickerContainer:{borderRadius:12,marginBottom:20,overflow:'hidden'},
@@ -801,6 +884,8 @@ const styles = StyleSheet.create({
   achievementsGrid:{flexDirection:'row',flexWrap:'wrap',gap:12},achievementItem:{width:(width-32-48-24)/4,aspectRatio:1,borderRadius:16,alignItems:'center',justifyContent:'center',padding:12,borderWidth:2},achievementIcon:{fontSize:32,marginBottom:6},achievementTitle:{fontSize:11,textAlign:'center',fontWeight:'600'},
   pinContainer:{flex:1,justifyContent:'center',alignItems:'center'},pinIcon:{fontSize:64,marginBottom:24},pinTitle:{fontSize:24,fontWeight:'700',marginBottom:32},pinInputContainer:{flexDirection:'row',gap:16,marginBottom:32},pinDot:{width:16,height:16,borderRadius:8},pinInputHidden:{position:'absolute',opacity:0,width:1,height:1},pinCancel:{fontSize:16},
   pulseContainer:{alignItems:'center',paddingVertical:24,marginBottom:16,borderRadius:20,borderWidth:1},pulseHeartGradient:{width:90,height:90,borderRadius:45,justifyContent:'center',alignItems:'center',marginBottom:12},pulseHeart:{fontSize:52},pulseText:{fontSize:20,fontWeight:'800'},
+  hapticButtonInHeart: { marginTop: 16, paddingVertical: 12, paddingHorizontal: 24, backgroundColor: 'rgba(255, 77, 109, 0.2)', borderRadius: 25, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  hapticButtonText: { fontSize: 16, fontWeight: '600' },
   floatingWidget: { position: 'absolute', bottom: 80, right: 20 }, floatingBtn: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 }, floatingText: { fontSize: 10, fontWeight: '700', marginTop: -2 }, closeWidget: { position: 'absolute', top: -10, right: -10, backgroundColor: '#000', width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   themeBtn: { flex: 1, padding: 12, borderRadius: 12, alignItems: 'center', borderWidth: 1 }, calendarItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, backgroundColor: '#0a0a14', borderRadius: 10, marginBottom: 8 },
   reactionsPicker: { flexDirection: 'row', gap: 16, padding: 20, backgroundColor: '#141428', borderRadius: 20, borderWidth: 1, borderColor: '#2a2a45' }, reactionBtn: { padding: 12, borderRadius: 12, backgroundColor: '#0a0a14' },
@@ -809,7 +894,11 @@ const styles = StyleSheet.create({
   colorPicker: { flexDirection: 'row', gap: 12, marginTop: 8, justifyContent: 'center' }, colorDot: { width: 36, height: 36, borderRadius: 18, borderWidth: 3 },
   settingButtonModern: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#ffffff10', borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#2a2a45' },
   settingItemModern: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: '#ffffff10', borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#2a2a45' },
-  langBtn: { flex: 1, padding: 14, borderRadius: 12, alignItems: 'center', borderWidth: 2 }
+  langBtn: { flex: 1, padding: 14, borderRadius: 12, alignItems: 'center', borderWidth: 2 },
+  genderModalContent: { width: '90%', borderRadius: 24, padding: 32, borderWidth: 1 },
+  genderButtons: { flexDirection: 'row', gap: 20, justifyContent: 'center', marginTop: 20 },
+  genderButton: { flex: 1, padding: 24, borderRadius: 16, alignItems: 'center', borderWidth: 2 },
+  genderButtonText: { fontSize: 16, fontWeight: '600' }
 });
 
 export default function App() { return <ErrorBoundary><AppContent /></ErrorBoundary>; }

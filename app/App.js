@@ -239,55 +239,195 @@ function AppContent() {
   const handleDeepLink = (url) => { if (url.includes('join=')) { const code = url.split('join=')[1]; setPairCode(code); setCurrentScreen('join'); } };
 
   const connectSocket = useCallback((code) => {
-    if (socketRef.current) { socketRef.current.disconnect(); socketRef.current = null; }
+    if (socketRef.current) { 
+      socketRef.current.disconnect(); 
+      socketRef.current = null; 
+    }
+    
+    console.log('🔌 Connecting to socket with code:', code, 'userRole:', userRole);
+    
     try {
-      const newSocket = io(CONFIG.SERVER_URL, { transports: ['websocket', 'poll'], reconnection: false, reconnectionDelay: 1000, reconnectionDelayMax: 10000, timeout: 20000 });
-      newSocket.on('connect', async () => {
-        reconnectAttempts.current = 0; setIsOnline(true);
-        newSocket.emit('join-pair', code); newSocket.emit('get-profiles', { pairCode: code }); newSocket.emit('load-messages', { pairCode: code }); newSocket.emit('load-mood-history', { pairCode: code });
-        if (myNickname) newSocket.emit('update-profile', { pairCode: code, user: userRole, nickname: myNickname, avatarColor: myAvatarColor });
-        try { const off = await AsyncStorage.getItem('offlineMessages'); if (off) { const pending = JSON.parse(off); pending.forEach(msg => newSocket.emit('send-message', msg)); await AsyncStorage.removeItem('offlineMessages'); } } catch(e) {}
+      const newSocket = io(CONFIG.SERVER_URL, { 
+        transports: ['websocket', 'poll'], 
+        reconnection: true,
+        reconnectionDelay: 1000, 
+        reconnectionDelayMax: 5000, 
+        timeout: 20000 
       });
-      newSocket.on('disconnect', () => { setIsOnline(false); attemptReconnect(code); });
-      newSocket.on('connect_error', () => { setIsOnline(false); attemptReconnect(code); });
-      newSocket.on('profiles-loaded', (p) => { if(!p) return; const me=p.find(x=>x.user_id===userRole), ot=p.find(x=>x.user_id!==userRole); if(me){setMyNickname(me.nickname||'Я');setMyAvatarColor(me.avatar_color||AVATAR_COLORS[0]);} if(ot){setPartnerNickname(ot.nickname||'Партнёр');setPartnerAvatarColor(ot.avatar_color||AVATAR_COLORS[1]);} });
-      newSocket.on('messages-loaded', (m) => { setMessages(m||[]); AsyncStorage.setItem('chatMessages', JSON.stringify(m||[])); });
+      
+      newSocket.on('connect', () => {
+        console.log('✅ Socket connected:', newSocket.id);
+        setIsOnline(true);
+        
+        newSocket.emit('join-pair', code);
+        console.log('👥 Joined pair room:', code);
+        
+        newSocket.emit('get-profiles', { pairCode: code });
+        newSocket.emit('load-messages', { pairCode: code });
+        newSocket.emit('load-mood-history', { pairCode: code });
+        
+        if (myNickname) {
+          newSocket.emit('update-profile', { 
+            pairCode: code, 
+            user: userRole, 
+            nickname: myNickname, 
+            avatarColor: myAvatarColor 
+          });
+        }
+      });
+      
+      newSocket.on('disconnect', () => { 
+        console.log('❌ Socket disconnected');
+        setIsOnline(false); 
+      });
+      
+      newSocket.on('connect_error', (err) => { 
+        console.error('❌ Socket connection error:', err);
+        setIsOnline(false); 
+      });
+      
+      newSocket.on('profiles-loaded', (p) => { 
+        console.log('📊 Profiles loaded:', p);
+        if(!p) return; 
+        const me = p.find(x => x.user_id === userRole);
+        const ot = p.find(x => x.user_id !== userRole); 
+        if(me) {
+          setMyNickname(me.nickname || 'Я');
+          setMyAvatarColor(me.avatar_color || AVATAR_COLORS[0]);
+        } 
+        if(ot) {
+          setPartnerNickname(ot.nickname || 'Партнёр');
+          setPartnerAvatarColor(ot.avatar_color || AVATAR_COLORS[1]);
+        } 
+      });
+      
+      newSocket.on('messages-loaded', (m) => { 
+        console.log('💬 Messages loaded:', m?.length || 0);
+        setMessages(m || []); 
+        AsyncStorage.setItem('chatMessages', JSON.stringify(m || [])); 
+      });
+      
       newSocket.on('new-message', async (msg) => {
+        console.log('📨 New message received:', msg);
         if (!msg) return;
-        setMessages(prev => { const f = (prev || []).filter(x => !x.temp || x.id === msg.id); const u = [...f, msg]; AsyncStorage.setItem('chatMessages', JSON.stringify(u)); return u; });
+        setMessages(prev => { 
+          const f = (prev || []).filter(x => !x.temp || x.id === msg.id); 
+          const u = [...f, msg]; 
+          AsyncStorage.setItem('chatMessages', JSON.stringify(u)); 
+          return u; 
+        });
         if (msg.user_id !== userRole) {
           newSocket.emit('mark-read', { pairCode: code, messageId: msg.id, reader: userRole });
           if (!IS_WEB) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            const c = hideNotificationContent ? { title: '💬 Сообщение', body: 'Нажмите' } : { title: `💬 ${msg.nickname || 'Партнёр'}`, body: msg.media_type ? '📎 Вложение' : msg.text };
-            await Notifications.scheduleNotificationAsync({ content: { ...c, sound: soundEnabled ? 'default' : null }, trigger: null });
+            const c = hideNotificationContent
+              ? { title: '💬 Сообщение', body: 'Нажмите' }
+              : { title: `💬 ${msg.nickname || 'Партнёр'}`, body: msg.media_type ? '📎 Вложение' : msg.text };
+            await Notifications.scheduleNotificationAsync({ 
+              content: { ...c, sound: soundEnabled ? 'default' : null }, 
+              trigger: null 
+            });
           }
         }
       });
-      newSocket.on('message-sent', (msg) => { if(!msg) return; setMessages(prev=>{const f=(prev||[]).filter(x=>!x.temp),u=[...f,msg];AsyncStorage.setItem('chatMessages',JSON.stringify(u));return u;}); checkAchievements(); });
-      newSocket.on('message-read', (d) => { if(!d||!d.messageId) return; setMessages(p=>(p||[]).map(m=>m.id===d.messageId?{...m,read_by_partner:true}:m)); });
-      newSocket.on('partner-typing', (d)=>{if(!d)return;setPartnerTyping(d.nickname||'Партнёр');});
-      newSocket.on('partner-stopped-typing', ()=>setPartnerTyping(''));
-      newSocket.on('status-updated', (d)=>{if(!d)return;if(d.user==='M')setStatusA(d.value);else setStatusB(d.value);});
-      newSocket.on('mood-history-loaded', (h)=>setMoodHistory(h||[]));
-      newSocket.on('peace-updated', (d)=>{if(!d)return;setPeaceActive(d.active);if(d.active)checkAchievements();});
-      newSocket.on('streak-updated', (d)=>{if(!d||d.streak===undefined)return;setStreak(d.streak);AsyncStorage.setItem('ritualStreak',d.streak.toString());checkAchievements();});
-      newSocket.on('sleep-updated', (p)=>{if(!p)return;const a=p.active===true,u=p.user||null;setPartnerSleeping(u&&u!==userRole&&a);});
+
+      newSocket.on('message-sent', (msg) => { 
+        console.log('✅ Message sent:', msg);
+        if(!msg) return; 
+        setMessages(prev => {
+          const f = (prev || []).filter(x => !x.temp);
+          const u = [...f, msg];
+          AsyncStorage.setItem('chatMessages', JSON.stringify(u));
+          return u;
+        });
+        checkAchievements(); 
+      });
+      
+      newSocket.on('message-read', (d) => { 
+        if(!d || !d.messageId) return; 
+        setMessages(p => (p || []).map(m => m.id === d.messageId ? {...m, read_by_partner: true} : m)); 
+      });
+      
+      newSocket.on('partner-typing', (d) => {
+        if(!d) return;
+        setPartnerTyping(d.nickname || 'Партнёр');
+      });
+      
+      newSocket.on('partner-stopped-typing', () => {
+        setPartnerTyping('');
+      });
+      
+      newSocket.on('status-updated', (d) => {
+        console.log('😊 Status updated:', d);
+        if(!d) return;
+        if(d.user === 'M') setStatusA(d.value);
+        else setStatusB(d.value);
+      });
+      
+      newSocket.on('mood-history-loaded', (h) => {
+        setMoodHistory(h || []);
+      });
+      
+      newSocket.on('peace-updated', (d) => {
+        if(!d) return;
+        setPeaceActive(d.active);
+        if(d.active) checkAchievements();
+      });
+      
+      newSocket.on('streak-updated', (d) => {
+        if(!d || d.streak === undefined) return;
+        setStreak(d.streak);
+        AsyncStorage.setItem('ritualStreak', d.streak.toString());
+        checkAchievements();
+      });
+      
+      newSocket.on('sleep-updated', (p) => {
+        if(!p) return;
+        const a = p.active === true;
+        const u = p.user || null;
+        setPartnerSleeping(u && u !== userRole && a);
+      });
+      
       newSocket.on('quiz-updated', ({ quiz }) => {
         if (!quiz) return;
-        const today = new Date().toDateString(); const questionIdx = new Date().getDate() % DAILY_QUESTIONS.length; const question = DAILY_QUESTIONS[questionIdx];
-        const updatedState = { date: today, question, answered: quiz[`ans_${userRole === 'M' ? 'a' : 'b'}`] ? true : quizState.answered, revealed: quiz.revealed, myAns: quiz[`ans_${userRole === 'M' ? 'a' : 'b'}`] || quizState.myAns, partnerAns: quiz[`ans_${userRole === 'M' ? 'b' : 'a'}`] || quizState.partnerAns };
-        setQuizState(updatedState); AsyncStorage.setItem('dailyQuiz', JSON.stringify(updatedState));
+        const today = new Date().toDateString(); 
+        const questionIdx = new Date().getDate() % DAILY_QUESTIONS.length; 
+        const question = DAILY_QUESTIONS[questionIdx];
+        const updatedState = { 
+          date: today, 
+          question, 
+          answered: quiz[`ans_${userRole === 'M' ? 'a' : 'b'}`] ? true : quizState.answered, 
+          revealed: quiz.revealed, 
+          myAns: quiz[`ans_${userRole === 'M' ? 'a' : 'b'}`] || quizState.myAns, 
+          partnerAns: quiz[`ans_${userRole === 'M' ? 'b' : 'a'}`] || quizState.partnerAns 
+        };
+        setQuizState(updatedState); 
+        AsyncStorage.setItem('dailyQuiz', JSON.stringify(updatedState));
         if (updatedState.revealed && updatedState.answered) {
           const newMatch = quiz[`ans_${userRole === 'M' ? 'a' : 'b'}`] === quiz[`ans_${userRole === 'M' ? 'b' : 'a'}`];
-          setMatchStats(prev => { const updated = { total: prev.total + 1, matches: prev.matches + (newMatch ? 1 : 0) }; AsyncStorage.setItem('matchStats', JSON.stringify(updated)); return updated; });
+          setMatchStats(prev => { 
+            const updated = { total: prev.total + 1, matches: prev.matches + (newMatch ? 1 : 0) }; 
+            AsyncStorage.setItem('matchStats', JSON.stringify(updated)); 
+            return updated; 
+          });
           Alert.alert('🔓 Ответы!', `Ты: ${updatedState.myAns}\nПартнёр: ${updatedState.partnerAns}${newMatch ? '\n✨ Совпадение!' : ''}`);
           if (newMatch && !IS_WEB) triggerConfetti();
         }
       });
-      newSocket.on('receive-haptic-pulse', ({ from }) => { if (!IS_WEB) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 300); Alert.alert('💓 Любовь', `${from} отправил пульс!`); } });
+      
+      newSocket.on('receive-haptic-pulse', ({ from }) => { 
+        if (!IS_WEB) { 
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); 
+          setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 300); 
+          Alert.alert('💓 Любовь', `${from} отправил пульс!`); 
+        } 
+      });
+      
       socketRef.current = newSocket;
-    } catch(e){console.error(e);setHasError(true);}
+    } catch(e) {
+      console.error('❌ Socket connection failed:', e);
+      setHasError(true);
+    }
   }, [myNickname, quizState, hideNotificationContent, soundEnabled, userRole]);
 
   const attemptReconnect = useCallback((code) => { if(reconnectAttempts.current>=maxReconnectAttempts.current) return; const delay=Math.min(1000*Math.pow(2,reconnectAttempts.current),30000); reconnectTimeout.current=setTimeout(()=>{reconnectAttempts.current+=1;connectSocket(code);},delay); }, [connectSocket]);
@@ -554,7 +694,7 @@ function AppContent() {
                   </TouchableOpacity>
                   <View style={{flexDirection:'row',gap:12,marginTop:12}}>
                     <TouchableOpacity onPress={()=>{setLang('ru');AsyncStorage.setItem('appLang','ru')}} style={[styles.langBtn,{backgroundColor:lang==='ru'?colors.primary:colors.bg,borderColor:colors.border}]}><Text style={{color:lang==='ru'?'#fff':colors.text,fontWeight:'600'}}>🇷 RU</Text></TouchableOpacity>
-                    <TouchableOpacity onPress={()=>{setLang('en');AsyncStorage.setItem('appLang','en')}} style={[styles.langBtn,{backgroundColor:lang==='en'?colors.primary:colors.bg,borderColor:colors.border}]}><Text style={{color:lang==='en'?'#fff':colors.text,fontWeight:'600'}}>🇬🇧 EN</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={()=>{setLang('en');AsyncStorage.setItem('appLang','en')}} style={[styles.langBtn,{backgroundColor:lang==='en'?colors.primary:colors.bg,borderColor:colors.border}]}><Text style={{color:lang==='en'?'#fff':colors.text,fontWeight:'600'}}>🇬 EN</Text></TouchableOpacity>
                   </View>
                 </View>
                 <View style={styles.settingSection}>

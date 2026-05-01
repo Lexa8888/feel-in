@@ -1,346 +1,315 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const { createClient } = require('@supabase/supabase-js');
 const http = require('http');
 const socketIo = require('socket.io');
 const { Expo } = require('expo-server-sdk');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const server = http.createServer(app);
-
-const io = socketIo(server, {
-  cors: { origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], credentials: true }
+const io = socketIo(server, { 
+  cors: { 
+    origin: '*', 
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], 
+    credentials: true 
+  } 
 });
 
-app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], credentials: true }));
+app.use(helmet());
+app.use(cors({ 
+  origin: '*', 
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], 
+  credentials: true 
+}));
+
+const limiter = rateLimit({ 
+  windowMs: 15 * 60 * 1000, 
+  max: 100, 
+  message: { error: 'Too many requests' } 
+});
+app.use('/api/', limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
-console.log('🔑 Supabase URL:', SUPABASE_URL);
-console.log('🔑 Supabase Key:', SUPABASE_ANON_KEY ? 'Set (hidden)' : 'MISSING!');
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error('❌ Missing Supabase credentials!');
+  process.exit(1);
+}
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { 
+  auth: { persistSession: false } 
+});
+
 const expo = new Expo();
-
 const userPushTokens = {};
 const pairSockets = {};
+const typingUsers = {};
 
-io.on('connection', (socket) => {
-  console.log('🔌 Client connected:', socket.id);
+console.log('✅ Server starting...');
+console.log('📊 Supabase URL:', SUPABASE_URL);
 
-  socket.on('register-push-token', async ({ user, token, pairCode }) => {
-    console.log(`📱 Push token registered: User ${user}, Pair ${pairCode}`);
-    
-    if (!userPushTokens[pairCode]) {
-      userPushTokens[pairCode] = {};
-    }
-    userPushTokens[pairCode][user] = token;
-  });
-
-  socket.on('join-pair', (pairId) => {
-    console.log(`👥 Socket ${socket.id} joining pair: ${pairId}`);
-    socket.join(pairId);
-    pairSockets[socket.id] = pairId;
-  });
-
-  socket.on('update-status', async ({ code, user, value }) => {
-    try {
-      const { data: pair, error: fetchError } = await supabase.from('pairs').select('*').eq('code', code).single();
-      if (fetchError) throw fetchError;
-
-      const updateField = user === 'M' ? 'status_a' : 'status_b';
-      const {  updatedPair, error: updateError } = await supabase
-        .from('pairs')
-        .update({ [updateField]: value, updated_at: new Date().toISOString() })
-        .eq('code', code)
-        .select('*')
-        .single();
-
-      if (updateError) throw updateError;
-
-      const partner = user === 'M' ? 'Ж' : 'M';
-      const partnerToken = userPushTokens[code]?.[partner];
-      
-      if (partnerToken && Expo.isExpoPushToken(partnerToken)) {
-        try {
-          await expo.sendPushNotificationsAsync([{
-            to: partnerToken,
-            sound: 'default',
-            title: '💕 Feel In',
-            body: `Партнёр обновил настроение: ${value}`,
-            data: { code: code, type: 'status' }
-          }]);
-          console.log('🔔 Push sent: status update');
-        } catch (e) {
-          console.error('❌ Push error:', e);
-        }
-      }
-
-      io.to(pairSockets[socket.id]).emit('status-updated', updatedPair);
-    } catch (error) {
-      console.error('❌ [status] Error:', error);
-      socket.emit('error', { event: 'update-status', message: error.message });
-    }
-  });
-
-  socket.on('complete-ritual', async ({ code, user, text }) => {
-    try {
-      const { data: pair, error: fetchError } = await supabase.from('pairs').select('*').eq('code', code).single();
-      if (fetchError) throw fetchError;
-
-      const ritualField = user === 'M' ? 'ritual_a' : 'ritual_b';
-      const today = new Date().toISOString().split('T')[0];
-      
-      const otherRitualField = user === 'M' ? 'ritual_b' : 'ritual_a';
-      const otherPartnerDone = pair[otherRitualField];
-      const newStreak = otherPartnerDone ? (pair.streak || 0) + 1 : (pair.streak || 0);
-
-      const {  updatedPair, error: updateError } = await supabase
-        .from('pairs')
-        .update({ [ritualField]: text, last_ritual: today, streak: newStreak, updated_at: new Date().toISOString() })
-        .eq('code', code)
-        .select('*')
-        .single();
-
-      if (updateError) throw updateError;
-
-      await supabase.from('rituals').insert({
-        id: Date.now().toString(), pair_id: updatedPair.id, user_id: user, text, completed: true, completed_at: new Date().toISOString()
-      });
-
-      const partner = user === 'M' ? 'Ж' : 'M';
-      const partnerToken = userPushTokens[code]?.[partner];
-      
-      if (partnerToken && Expo.isExpoPushToken(partnerToken)) {
-        try {
-          await expo.sendPushNotificationsAsync([{
-            to: partnerToken,
-            sound: 'default',
-            title: '❤️ Новый ритуал',
-            body: `Партнёр написал: "${text}"`,
-            data: { code: code, type: 'ritual' }
-          }]);
-          console.log('🔔 Push sent: ritual');
-        } catch (e) {
-          console.error('❌ Push error:', e);
-        }
-      }
-
-      if ([3, 5, 7].includes(newStreak)) {
-        const tokens = userPushTokens[code];
-        if (tokens) {
-          for (const [u, token] of Object.entries(tokens)) {
-            if (Expo.isExpoPushToken(token)) {
-              await expo.sendPushNotificationsAsync([{
-                to: token,
-                sound: 'default',
-                title: '🔥 Поздравляем!',
-                body: `Вы поддерживаете связь уже ${newStreak} дней подряд! Так держать! 💪`,
-                data: { code: code, type: 'streak', days: newStreak }
-              }]);
-            }
-          }
-          console.log(`🔥 Streak milestone: ${newStreak} days`);
-        }
-      }
-
-      io.to(pairSockets[socket.id]).emit('ritual-updated', updatedPair);
-    } catch (error) {
-      console.error('❌ [ritual] Error:', error);
-      socket.emit('error', { event: 'complete-ritual', message: error.message });
-    }
-  });
-
-  socket.on('add-diary', async ({ code, user, text }) => {
-    try {
-      const { data: pair, error: fetchError } = await supabase.from('pairs').select('*').eq('code', code).single();
-      if (fetchError) throw fetchError;
-
-      const diaryEntry = { id: Date.now().toString(), by: user, text, createdAt: new Date().toISOString() };
-      const updatedDiary = [...(pair.diary || []), diaryEntry];
-
-      const {  updatedPair, error: updateError } = await supabase
-        .from('pairs')
-        .update({ diary: updatedDiary, updated_at: new Date().toISOString() })
-        .eq('code', code)
-        .select('*')
-        .single();
-
-      if (updateError) throw updateError;
-
-      await supabase.from('diary').insert({ id: diaryEntry.id, pair_id: updatedPair.id, user_id: user, text });
-
-      const partner = user === 'M' ? 'Ж' : 'M';
-      const partnerToken = userPushTokens[code]?.[partner];
-      
-      if (partnerToken && Expo.isExpoPushToken(partnerToken)) {
-        try {
-          await expo.sendPushNotificationsAsync([{
-            to: partnerToken,
-            sound: 'default',
-            title: '📝 Новая запись в дневнике',
-            body: `${user} добавил(а) запись`,
-            data: { code: code, type: 'diary' }
-          }]);
-          console.log('🔔 Push sent: diary');
-        } catch (e) {
-          console.error('❌ Push error:', e);
-        }
-      }
-
-      io.to(pairSockets[socket.id]).emit('diary-updated', updatedPair);
-    } catch (error) {
-      console.error('❌ [diary] Error:', error);
-      socket.emit('error', { event: 'add-diary', message: error.message });
-    }
-  });
-
-  // ✅ КНОПКА МИР + PUSH
-  socket.on('peace-request', async ({ code, user }) => {
-    try {
-      const { data: pair, error: fetchError } = await supabase.from('pairs').select('*').eq('code', code).single();
-      if (fetchError) throw fetchError;
-
-      const peaceData = { active: true, from: user, timestamp: new Date().toISOString() };
-      const {  updatedPair, error: updateError } = await supabase
-        .from('pairs')
-        .update({ peace: peaceData, updated_at: new Date().toISOString() })
-        .eq('code', code)
-        .select('*')
-        .single();
-
-      if (updateError) throw updateError;
-      
-      await supabase.from('peace').insert({ 
-        id: Date.now().toString(), 
-        pair_id: updatedPair.id, 
-        from_user: user, 
-        active: true 
-      });
-
-      // 🔔 ОТПРАВКА PUSH ПАРТНЁРУ
-      const partner = user === 'M' ? 'Ж' : 'M';
-      const partnerToken = userPushTokens[code]?.[partner];
-      
-      if (partnerToken && Expo.isExpoPushToken(partnerToken)) {
-        try {
-          await expo.sendPushNotificationsAsync([{
-            to: partnerToken,
-            sound: 'default',
-            title: '🤝 Сигнал мира',
-            body: 'Партнёр хочет помириться',
-            data: { code: code, type: 'peace' }
-          }]);
-          console.log('🔔 Push sent: peace request');
-        } catch (e) {
-          console.error('❌ Push error:', e);
-        }
-      }
-
-      io.to(pairSockets[socket.id]).emit('peace-updated', updatedPair);
-    } catch (error) {
-      console.error('❌ [peace] Error:', error);
-      socket.emit('error', { event: 'peace-request', message: error.message });
-    }
-  });
-
-  socket.on('quiz-submit', async ({ code, user, ans }) => {
-    try {
-      const { data: pair, error: fetchError } = await supabase.from('pairs').select('*').eq('code', code).single();
-      if (fetchError) throw fetchError;
-
-      const quizField = user === 'M' ? 'ans_a' : 'ans_b';
-      const currentQuiz = pair.quiz || {};
-      const updatedQuiz = { ...currentQuiz, [quizField]: ans, question: currentQuiz.question || 'Daily Question' };
-      const bothAnswered = updatedQuiz.ans_a && updatedQuiz.ans_b;
-      
-      const {  updatedPair, error: updateError } = await supabase
-        .from('pairs')
-        .update({ quiz: { ...updatedQuiz, revealed: bothAnswered }, updated_at: new Date().toISOString() })
-        .eq('code', code)
-        .select('*')
-        .single();
-
-      if (updateError) throw updateError;
-      if (bothAnswered) {
-        await supabase.from('quiz').insert({
-          id: Date.now().toString(), pair_id: updatedPair.id, question: updatedQuiz.question,
-          ans_a: updatedQuiz.ans_a, ans_b: updatedQuiz.ans_b, revealed: true
-        });
-      }
-      io.to(pairSockets[socket.id]).emit('quiz-updated', updatedPair);
-    } catch (error) {
-      console.error('❌ [quiz] Error:', error);
-      socket.emit('error', { event: 'quiz-submit', message: error.message });
-    }
-  });
-
-  socket.on('disconnect', () => {
-    const pairId = pairSockets[socket.id];
-    if (pairId) { socket.leave(pairId); delete pairSockets[socket.id]; }
-  });
-});
-
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), supabase: SUPABASE_URL ? 'configured' : 'missing' });
-});
-
-app.post('/api/pair/create', async (req, res) => {
+// Health check
+app.get('/api/health', async (req, res) => {
   try {
-    let code, data, error, attempts = 0;
+    const { data, error } = await supabase.from('pairs').select('count').limit(1);
+    res.json({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString(),
+      supabase: error ? 'error: ' + error.message : 'configured',
+      pairsCount: data?.length || 0
+    });
+  } catch (e) {
+    res.json({ status: 'error', message: e.message });
+  }
+});
+
+// ✅ ИСПРАВЛЕНО: Создание пары
+app.post('/api/pair/create', async (req, res) => {
+  console.log('📝 Creating new pair...');
+  try {
+    let code, result, error, attempts = 0;
+    
     do {
       code = 'FEEL-' + Math.random().toString(36).substring(2, 6).toUpperCase();
-      const result = await supabase
+      console.log(`🎲 Trying code: ${code}`);
+      
+      result = await supabase
         .from('pairs')
-        .insert({ id: Date.now().toString(), code, streak: 0, created_at: new Date().toISOString() })
+        .insert([{ 
+          id: Date.now().toString() + Math.random().toString(36).substring(2, 6),
+          code: code,
+          streak: 0,
+          created_at: new Date().toISOString()
+        }])
         .select()
         .single();
-      data = result.data;
+      
       error = result.error;
       attempts++;
-    } while (error?.code === '23505' && attempts < 5);
-
+      
+      if (error && error.code === '23505') {
+        console.log(`⚠️ Code ${code} already exists, trying again...`);
+      }
+    } while (error && error.code === '23505' && attempts < 10);
+    
     if (error) throw error;
-    res.json({ success: true, code, pairId: data.id });
-  } catch (error) {
-    console.error('❌ [API] Failed to create pair:', error);
-    res.status(500).json({ error: 'Failed to create pair', details: error.message });
+    
+    console.log(`✅ Pair created: ${code}`);
+    res.json({ 
+      success: true, 
+      code: code,
+      pairId: result.data.id 
+    });
+  } catch (e) {
+    console.error('❌ Create pair error:', e);
+    res.status(500).json({ 
+      success: false,
+      error: e.message 
+    });
   }
 });
 
+// ✅ ИСПРАВЛЕНО: Вход в пару
 app.post('/api/pair/join', async (req, res) => {
+  console.log('🔑 Join pair request:', req.body);
   try {
-    const { code, userId } = req.body;
-    const {  pair, error: fetchError } = await supabase.from('pairs').select('*').eq('code', code.toUpperCase()).single();
-    if (fetchError) throw fetchError;
-    if (!pair) return res.status(404).json({ error: 'Pair not found' });
-
-    const userField = userId === 'M' ? 'user_a' : 'user_b';
-    const { data: updatedPair, error: updateError } = await supabase
+    let { code } = req.body;
+    
+    if (!code) {
+      console.log('❌ No code provided');
+      return res.status(400).json({ error: 'Code is required' });
+    }
+    
+    // Очищаем код и приводим к верхнему регистру
+    code = code.trim().toUpperCase();
+    
+    // Добавляем FEEL- если нет
+    if (!code.startsWith('FEEL-')) {
+      code = 'FEEL-' + code.replace('FEEL-', '');
+    }
+    
+    console.log(`🔍 Searching for pair with code: ${code}`);
+    
+    // Ищем пару
+    const { data: pair, error } = await supabase
       .from('pairs')
-      .update({ [userField]: userId, updated_at: new Date().toISOString() })
-      .eq('code', code.toUpperCase())
       .select('*')
+      .eq('code', code)
       .single();
-
-    if (updateError) throw updateError;
-    res.json({ success: true, pair: updatedPair, pairId: pair.id });
-  } catch (error) {
-    console.error('❌ [API] Failed to join pair:', error);
-    res.status(500).json({ error: 'Failed to join pair', details: error.message });
+    
+    if (error) {
+      console.error('❌ Database error:', error);
+      return res.status(404).json({ 
+        error: 'Pair not found',
+        details: error.message 
+      });
+    }
+    
+    if (!pair) {
+      console.log(`❌ Pair ${code} not found in database`);
+      return res.status(404).json({ 
+        error: 'Pair not found',
+        searchedCode: code 
+      });
+    }
+    
+    console.log(`✅ Pair found: ${code}`, pair.id);
+    res.json({ 
+      success: true, 
+      pair: pair,
+      pairId: pair.id 
+    });
+  } catch (e) {
+    console.error('❌ Join pair error:', e);
+    res.status(500).json({ 
+      error: e.message,
+      stack: process.env.NODE_ENV === 'development' ? e.stack : undefined
+    });
   }
+});
+
+// Socket.IO connections
+io.on('connection', (socket) => {
+  console.log('🔌 Client connected:', socket.id);
+  
+  socket.on('join-pair', async (pairCode) => {
+    console.log(`👥 Socket ${socket.id} joining pair: ${pairCode}`);
+    socket.join(pairCode);
+    pairSockets[socket.id] = pairCode;
+    
+    try {
+      const { data } = await supabase
+        .from('pairs')
+        .select('sleep_mode, sleep_until')
+        .eq('code', pairCode)
+        .single();
+      
+      if (data) {
+        socket.emit('sleep-updated', { 
+          active: data.sleep_mode, 
+          sleepUntil: data.sleep_until, 
+          user: data.sleep_mode ? 'system' : null 
+        });
+      }
+    } catch(e) { 
+      console.error('Sleep fetch err:', e); 
+    }
+  });
+  
+  socket.on('update-profile', async ({ pairCode, user, nickname, avatarColor }) => { 
+    try { 
+      await supabase
+        .from('profiles')
+        .upsert({ 
+          pair_code: pairCode, 
+          user_id: user, 
+          nickname: nickname || user, 
+          avatar_color: avatarColor || '#4ECDC4', 
+          updated_at: new Date().toISOString() 
+        })
+        .eq('pair_code', pairCode)
+        .eq('user_id', user);
+      
+      io.to(pairCode).emit('profile-updated', { 
+        user, 
+        nickname: nickname || user, 
+        avatarColor: avatarColor || '#4ECDC4' 
+      });
+    } catch (e) { 
+      console.error('Profile err:', e); 
+    } 
+  });
+  
+  socket.on('get-profiles', async ({ pairCode }) => { 
+    try { 
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('pair_code', pairCode);
+      
+      if (data) socket.emit('profiles-loaded', data);
+    } catch (e) { 
+      console.error('Get profiles err:', e); 
+    } 
+  });
+  
+  socket.on('load-messages', async ({ pairCode }) => { 
+    try { 
+      const { data } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('pair_code', pairCode)
+        .order('created_at', { ascending: true })
+        .limit(50);
+      
+      if (data) socket.emit('messages-loaded', data);
+    } catch (e) { 
+      console.error('Load messages err:', e); 
+    } 
+  });
+  
+  socket.on('send-message', async ({ code, user, text, timestamp, nickname, mediaUrl, mediaType }) => { 
+    try { 
+      const msg = { 
+        id: Date.now().toString() + Math.random().toString(36).substring(2, 6), 
+        pair_code: code, 
+        user_id: user, 
+        nickname: nickname || user, 
+        text: text || '', 
+        media_url: mediaUrl || null, 
+        media_type: mediaType || null, 
+        read_by_partner: false, 
+        created_at: timestamp || new Date().toISOString() 
+      }; 
+      
+      await supabase.from('messages').insert(msg); 
+      socket.to(code).emit('new-message', msg); 
+      socket.emit('message-sent', msg); 
+      
+      const partner = user === 'M' ? 'Ж' : 'M'; 
+      const token = userPushTokens[code]?.[partner]; 
+      
+      if (token && Expo.isExpoPushToken(token)) { 
+        expo.sendPushNotificationsAsync([{ 
+          to: token, 
+          sound: 'default', 
+          title: `💬 ${msg.nickname}`, 
+          body: mediaType ? `📎 Вложение` : (msg.text.length > 40 ? msg.text.substring(0, 40) + '...' : msg.text), 
+          data: { code, type: 'message' } 
+        }]).catch(e => console.error('Push err:', e)); 
+      } 
+    } catch (e) { 
+      console.error('Chat err:', e); 
+    } 
+  });
+  
+  socket.on('disconnect', () => { 
+    const pid = pairSockets[socket.id]; 
+    if (pid) { 
+      socket.leave(pid); 
+      delete pairSockets[socket.id]; 
+      if (typingUsers[pid]) { 
+        Object.values(typingUsers[pid]).forEach(clearTimeout); 
+        delete typingUsers[pid]; 
+      } 
+    } 
+  });
 });
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log('🚀 Server running on port', PORT);
-  console.log('📡 Socket.IO ready');
-  console.log(' Push Notifications enabled');
-  console.log('🗄️ Supabase:', SUPABASE_URL ? '✓ Connected' : '✗ Not configured');
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🌐 Health check: http://localhost:${PORT}/api/health`);
 });
 
-process.on('unhandledRejection', (reason) => console.error('❌ Unhandled Rejection:', reason));
-process.on('uncaughtException', (error) => { console.error('❌ Uncaught Exception:', error); process.exit(1); });
+process.on('unhandledRejection', (r) => console.error('❌ Unhandled:', r));
+process.on('uncaughtException', (e) => { 
+  console.error('❌ Exception:', e); 
+  process.exit(1); 
+});

@@ -1,39 +1,79 @@
 {
   "expo": {
-    "name": "Feel in",
+    "name": "Feel In",
     "slug": "feel-in",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
-    "host": "lan",
-    "splash": {
-      "image": "./assets/icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0F0F1A"
-    },
-    "updates": {
-      "fallbackToCacheTimeout": 0
-    },
+    "userInterfaceStyle": "automatic",
+    "scheme": "feelin",
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.feelin.app"
+      "bundleIdentifier": "com.feelin.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Нужен доступ к камере для отправки фото",
+        "NSMicrophoneUsageDescription": "Нужен доступ к микрофону для голосовых",
+        "NSPhotoLibraryUsageDescription": "Нужен доступ к галерее для выбора фото",
+        "NSCalendarsUsageDescription": "Feel In нужен доступ к календарю, чтобы импортировать важные даты и напоминания.",
+        "UIBackgroundModes": ["fetch", "remote-notification"]
+      }
     },
     "android": {
       "package": "com.feelin.app",
-      "permissions": ["POST_NOTIFICATIONS"]
+      "versionCode": 8,
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.CAMERA",
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR"
+      ],
+      "softwareKeyboardLayoutMode": "pan",
+      "adaptiveIcon": {
+        "backgroundColor": "#0F0F1A"
+      }
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "bundler": "metro"
     },
+    "splash": {
+      "backgroundColor": "#0F0F1A",
+      "resizeMode": "contain"
+    },
+    "updates": {
+      "enabled": true,
+      "fallbackToCacheTimeout": 0,
+      "checkAutomatically": "ON_LOAD"
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          },
+          "android": {
+            "enableProguardInReleaseBuilds": true
+          }
+        }
+      ]
+    ],
     "extra": {
       "eas": {
         "projectId": "0636e412-9635-4a63-a35d-bf97572f3861"
+      },
+      "abTests": {
+        "chatBubbleShape": "rounded",
+        "pulseAnimationSpeed": "normal",
+        "widgetCompactMode": true
       }
     },
-    "plugins": [
-      "expo-notifications"
-    ]
+    "owner": "memfizz"
   }
 }

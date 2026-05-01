@@ -1,0 +1,45 @@
+{
+  "pairs": {
+    "FEEL-J1KC": {
+      "id": "FEEL-J1KC",
+      "userA": "A",
+      "userB": null,
+      "statusA": "🟢",
+      "statusB": "⚡",
+      "streak": 0,
+      "lastRitual": null,
+      "diary": [],
+      "peace": {
+        "active": false,
+        "from": null
+      },
+      "quiz": {
+        "q": "Что для вас значит \"время вместе\"?",
+        "ansA": "близость",
+        "ansB": null,
+        "revealed": false
+      }
+    },
+    "FEEL-6CHI": {
+      "id": "FEEL-6CHI",
+      "userA": "A",
+      "userB": null,
+      "statusA": "⚡",
+      "statusB": "⚡",
+      "streak": 0,
+      "lastRitual": null,
+      "diary": [],
+      "peace": {
+        "active": true,
+        "from": "A",
+        "timestamp": 1776080847883
+      },
+      "quiz": {
+        "q": "Что для вас значит \"время вместе\"?",
+        "ansA": null,
+        "ansB": null,
+        "revealed": false
+      }
+    }
+  }
+}

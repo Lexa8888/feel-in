@@ -1,16 +1,15 @@
-import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView,
-  SafeAreaView, Alert, ActivityIndicator, Animated, Dimensions,
-  FlatList, Modal, Platform, StatusBar, KeyboardAvoidingView,
-  Image, Easing, InteractionManager
+  StyleSheet, Text, View, TextInput, TouchableOpacity,
+  SafeAreaView, Alert, Animated, Platform, Modal,
+  KeyboardAvoidingView, FlatList
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as AsyncStorage from '@react-native-async-storage/async-storage';
 import io from 'socket.io-client';
 import { createClient } from '@supabase/supabase-js';
 
-// 🎯 CONFIG — ✅ ОБНОВЛЕНО С НОВЫМИ ДАННЫМИ
+// 🔐 CONFIG
 const CONFIG = {
   SUPABASE_URL: 'https://lslsvzpraiobchxvncdo.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_r8KH-Zuqv-j5mS4DDjDQZw_RtG81TcK',
@@ -18,653 +17,475 @@ const CONFIG = {
 };
 
 const IS_WEB = Platform.OS === 'web';
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
 
-// 🎨 Темы
-const themes = {
-  dark: { bg: '#0f0f1e', card: '#1a1a2e', text: '#ffffff', textMuted: '#a0a0b0', accent: '#ff6b9d', secondary: '#6b72ff', success: '#4ade80', warning: '#fbbf24', error: '#f87171', border: '#2a2a45' },
-  light: { bg: '#f8fafc', card: '#ffffff', text: '#1e293b', textMuted: '#64748b', accent: '#ec4899', secondary: '#6366f1', success: '#22c55e', warning: '#f59e0b', error: '#ef4444', border: '#e2e8f0' },
-  ocean: { bg: '#0c1929', card: '#1e3a5f', text: '#e0f2fe', textMuted: '#94a3b8', accent: '#38bdf8', secondary: '#0ea5e9', success: '#22d3ee', warning: '#fbbf24', error: '#f87171', border: '#334155' },
-  sunset: { bg: '#1a0f1a', card: '#2d1b3d', text: '#fef3c7', textMuted: '#d9b38c', accent: '#f97316', secondary: '#ec4899', success: '#a7f3d0', warning: '#fcd34d', error: '#fca5a5', border: '#4b2d5c' },
-  forest: { bg: '#0a1a0f', card: '#1b3a24', text: '#dcfce7', textMuted: '#86efac', accent: '#22c55e', secondary: '#16a34a', success: '#4ade80', warning: '#fbbf24', error: '#f87171', border: '#2d4a36' },
-  galaxy: { bg: '#0a0a1a', card: '#1a1a3a', text: '#e0e7ff', textMuted: '#a5b4fc', accent: '#8b5cf6', secondary: '#6366f1', success: '#a78bfa', warning: '#fbbf24', error: '#f87171', border: '#333355' },
-  secret: { bg: '#000000', card: '#111122', text: '#ffd700', textMuted: '#b8860b', accent: '#ff1493', secondary: '#9400d3', success: '#00ff7f', warning: '#ffa500', error: '#ff4500', border: '#333344' }
+// 🎨 COLORS
+const COLORS = {
+  bg: '#0f0f1e', card: '#1a1a2e', primary: '#ff6b9d', secondary: '#6b72ff',
+  text: '#ffffff', textMuted: '#a0a0b0', border: '#2a2a45'
 };
-
-// 🌍 Локализация
-const translations = {
-  ru: {
-    appTitle: 'Feel In 💑', createPair: 'Создать пару', joinPair: 'Войти по коду', yourCode: 'Ваш код:', partner: 'Партнёр', you: 'Вы', online: 'онлайн', offline: 'офлайн',
-    selectGender: 'Выберите пол', male: '👨 Мужской', female: '👩 Женский', continue: 'Продолжить', myStatus: 'Моё', partnerStatus: 'Партнёр',
-    partnerConnected: '🎉 Партнёр подключился!', syncMessage: 'Теперь вы можете общаться в реальном времени!',
-    chatPlaceholder: 'Напишите сообщение...', send: 'Отправить', sleepMode: '🌙 Спокойной ночи', wakeUp: '☀️ Я проснулся',
-    quizTitle: 'Вопрос дня', quizWaiting: 'Ожидание ответа партнёра...', quizRevealed: 'Вы оба ответили!',
-    peaceRequest: '🤝 Сигнал мира', peaceSent: 'Запрос отправлен', peaceAccepted: 'Примирение принято',
-    ritualTitle: '✨ Вечерний ритуал', ritualPlaceholder: 'За что вы благодарны сегодня?', ritualSave: 'Сохранить',
-    settings: 'Настройки', theme: 'Тема', language: 'Язык', notifications: 'Уведомления', security: 'Безопасность',
-    achievements: 'Достижения', messagesCount: 'Сообщений', streak: 'Серия дней', themeUnlocked: '🎁 Тема открыта!',
-    loading: 'Загрузка...', error: 'Ошибка', retry: 'Повторить', success: 'Готово'
-  },
-  en: {
-    appTitle: 'Feel In 💑', createPair: 'Create Pair', joinPair: 'Join with Code', yourCode: 'Your Code:', partner: 'Partner', you: 'You', online: 'online', offline: 'offline',
-    selectGender: 'Select Gender', male: '👨 Male', female: '👩 Female', continue: 'Continue', myStatus: 'Mine', partnerStatus: 'Partner',
-    partnerConnected: '🎉 Partner connected!', syncMessage: 'Now you can chat in real-time!',
-    chatPlaceholder: 'Type a message...', send: 'Send', sleepMode: '🌙 Good night', wakeUp: '☀️ I\'m awake',
-    quizTitle: 'Question of the Day', quizWaiting: 'Waiting for partner\'s answer...', quizRevealed: 'You both answered!',
-    peaceRequest: '🤝 Peace Signal', peaceSent: 'Request sent', peaceAccepted: 'Reconciliation accepted',
-    ritualTitle: '✨ Evening Ritual', ritualPlaceholder: 'What are you grateful for today?', ritualSave: 'Save',
-    settings: 'Settings', theme: 'Theme', language: 'Language', notifications: 'Notifications', security: 'Security',
-    achievements: 'Achievements', messagesCount: 'Messages', streak: 'Day Streak', themeUnlocked: '🎁 Theme Unlocked!',
-    loading: 'Loading...', error: 'Error', retry: 'Retry', success: 'Done'
-  }
-};
-
-// 😊 Настроение
-const MOOD_EMOJIS = [
-  { emoji: '😊', key: 'happy', label: 'Радость' },
-  { emoji: '😌', key: 'calm', label: 'Спокойствие' },
-  { emoji: '🤔', key: 'thinking', label: 'Задумчивость' },
-  { emoji: '😔', key: 'sad', label: 'Грусть' },
-  { emoji: '😤', key: 'frustrated', label: 'Раздражение' },
-  { emoji: '😍', key: 'love', label: 'Любовь' },
-  { emoji: '🤗', key: 'hug', label: 'Объятия' },
-  { emoji: '🔥', key: 'fire', label: 'Огонь' }
-];
-
-// 🎯 Оптимизированный компонент сообщения
-const MessageItem = memo(({ item, currentUserRole, colors }) => {
-  const isMe = item.user_id === currentUserRole;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  
-  useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: !IS_WEB,
-      easing: Easing.out(Easing.ease)
-    }).start();
-  }, [fadeAnim]);
-
-  return (
-    <Animated.View style={[
-      styles.messageBubble,
-      isMe ? styles.messageMine : styles.messagePartner,
-      { backgroundColor: isMe ? colors.accent : colors.card, opacity: fadeAnim }
-    ]}>
-      <Text style={[styles.messageText, { color: isMe ? '#fff' : colors.text }]} 
-            numberOfLines={10} ellipsizeMode="tail">
-        {item.text}
-      </Text>
-      <Text style={[styles.messageTime, { color: isMe ? 'rgba(255,255,255,0.7)' : colors.textMuted }]}>
-        {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-      </Text>
-    </Animated.View>
-  );
-});
 
 export default function App() {
-  // 🎯 State
-  const [themeMode, setThemeMode] = useState('dark');
-  const [lang, setLang] = useState('ru');
+  const [screen, setScreen] = useState('welcome');
   const [pairCode, setPairCode] = useState('');
-  const [userRole, setUserRole] = useState(null); // 'M' or 'Ж'
-  const [isCreator, setIsCreator] = useState(false);
-  const [connected, setConnected] = useState(false);
-  const [partnerOnline, setPartnerOnline] = useState(false);
+  const [userRole, setUserRole] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [genderModalVisible, setGenderModalVisible] = useState(false);
+  const [pendingCode, setPendingCode] = useState('');
   
-  // 💬 Chat
   const [messages, setMessages] = useState([]);
-  const [newMessage, setNewMessage] = useState('');
-  const [typingPartner, setTypingPartner] = useState(false);
-  const messagesEndRef = useRef(null);
-  const messageQueue = useRef([]);
-  
-  // 💓 Mood & Status
-  const [myMood, setMyMood] = useState(null);
-  const [partnerMood, setPartnerMood] = useState(null);
+  const [inputText, setInputText] = useState('');
   const [statusA, setStatusA] = useState(null);
   const [statusB, setStatusB] = useState(null);
-  
-  // 😴 Sleep Mode
+  const [quiz, setQuiz] = useState({ ans_a: null, ans_b: null, revealed: false });
   const [partnerSleeping, setPartnerSleeping] = useState(false);
   
-  // ❓ Quiz
-  const [quiz, setQuiz] = useState(null);
-  const [myAnswer, setMyAnswer] = useState(null);
-  const [partnerAnswer, setPartnerAnswer] = useState(null);
-  
-  // 🤝 Peace
-  const [peaceActive, setPeaceActive] = useState(false);
-  
-  // ✨ Animations
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const heartScale = useRef(new Animated.Value(1)).current;
-  
-  // 🔌 Socket & Supabase
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   const socketRef = useRef(null);
-  const supabase = useRef(null);
-  
-  const colors = themes[themeMode] || themes.dark;
-  const t = translations[lang];
 
-  // 🎯 Инициализация
+  // 🚀 INIT
   useEffect(() => {
-    // Load cached settings
-    const loadSettings = async () => {
-      try {
-        const [cachedTheme, cachedLang, cachedPair, cachedRole] = await Promise.all([
-          AsyncStorage.getItem('themeMode'),
-          AsyncStorage.getItem('lang'),
-          AsyncStorage.getItem('pairCode'),
-          AsyncStorage.getItem('userRole')
-        ]);
-        if (cachedTheme) setThemeMode(cachedTheme);
-        if (cachedLang) setLang(cachedLang);
-        if (cachedPair) setPairCode(cachedPair);
-        if (cachedRole) setUserRole(cachedRole);
-      } catch (e) { console.warn('Cache load error:', e); }
-    };
-    loadSettings();
-
-    // Init Supabase
-    supabase.current = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
-
-    // Init Socket
-    socketRef.current = io(CONFIG.SERVER_URL, {
-      transports: ['websocket'],
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000
-    });
-
-    socketRef.current.on('connect', () => {
-      console.log('✅ Socket connected');
-      setConnected(true);
-      if (!IS_WEB) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    });
-
-    socketRef.current.on('disconnect', () => {
-      console.log('❌ Socket disconnected');
-      setConnected(false);
-    });
-
-    // 📡 Socket listeners
-    socketRef.current.on('messages-loaded', (data) => {
-      setMessages(data.messages || []);
-      AsyncStorage.setItem(`messages_${pairCode}`, JSON.stringify(data.messages || []));
-    });
-
-    socketRef.current.on('new-message', (msg) => {
-      setMessages(prev => {
-        const exists = prev.some(m => m.id === msg.id);
-        if (exists) return prev;
-        const updated = [...prev, msg].slice(-100);
-        AsyncStorage.setItem(`messages_${pairCode}`, JSON.stringify(updated));
-        return updated;
-      });
-      if (!IS_WEB) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      scrollToBottom();
-    });
-
-    socketRef.current.on('status-updated', (data) => {
-      // 🔥 CRITICAL: Respect role separation
-      if (data.userRole === 'M') {
-        setStatusA(data.mood);
-        if (userRole === 'Ж') setPartnerMood(data.mood);
-      } else {
-        setStatusB(data.mood);
-        if (userRole === 'M') setPartnerMood(data.mood);
-      }
-    });
-
-    socketRef.current.on('quiz-updated', (data) => {
-      setQuiz(data.quiz);
-      // 🔥 CRITICAL: Separate answers by role
-      if (data.quiz.ans_a && data.quiz.ans_b) {
-        if (userRole === 'M') {
-          setMyAnswer(data.quiz.ans_a);
-          setPartnerAnswer(data.quiz.ans_b);
-        } else {
-          setMyAnswer(data.quiz.ans_b);
-          setPartnerAnswer(data.quiz.ans_a);
-        }
-      } else {
-        if (userRole === 'M') {
-          if (data.quiz.ans_a) setMyAnswer(data.quiz.ans_a);
-          else setMyAnswer(null);
-        } else {
-          if (data.quiz.ans_b) setMyAnswer(data.quiz.ans_b);
-          else setMyAnswer(null);
-        }
-      }
-    });
-
-    socketRef.current.on('sleep-updated', (data) => {
-      if (data.userRole !== userRole) {
-        setPartnerSleeping(data.sleeping);
-      }
-    });
-
-    socketRef.current.on('partner-typing', () => setTypingPartner(true));
-    socketRef.current.on('partner-stopped-typing', () => setTypingPartner(false));
-    
-    socketRef.current.on('peace-updated', (data) => {
-      setPeaceActive(data.active);
-      if (data.active && !IS_WEB) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        startHeartPulse();
-      }
-    });
-
-    return () => {
-      socketRef.current?.disconnect();
-    };
+    loadSession();
+    Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: !IS_WEB }).start();
+    return () => { if (socketRef.current) socketRef.current.disconnect(); };
   }, []);
 
-  // 🔄 Cache messages on mount
-  useEffect(() => {
-    if (pairCode && userRole) {
-      const loadCached = async () => {
-        try {
-          const cached = await AsyncStorage.getItem(`messages_${pairCode}`);
-          if (cached) setMessages(JSON.parse(cached));
-        } catch (e) { console.warn('Cache parse error:', e); }
-      };
-      loadCached();
-    }
-  }, [pairCode, userRole]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollToEnd({ animated: true });
+  // 📦 LOAD SESSION
+  const loadSession = async () => {
+    try {
+      const data = await AsyncStorage.getItem('feel_in_session');
+      if (data) {
+        const { code, role } = JSON.parse(data);
+        if (code && role) {
+          setPairCode(code);
+          setUserRole(role);
+          setScreen('main');
+          connectSocket(code, role);
+        }
+      }
+    } catch (e) { console.log('Session load error', e); }
   };
 
-  useEffect(() => { scrollToBottom(); }, [messages]);
+  // 🔌 CONNECT SOCKET
+  const connectSocket = (code, role) => {
+    if (socketRef.current) socketRef.current.disconnect();
+    
+    const newSocket = io(CONFIG.SERVER_URL, {
+      transports: ['websocket'],
+      query: { pairCode: code, userRole: role }
+    });
+    socketRef.current = newSocket;
 
-  const startHeartPulse = useCallback(() => {
-    Animated.sequence([
-      Animated.spring(heartScale, { toValue: 1.3, useNativeDriver: !IS_WEB }),
-      Animated.spring(heartScale, { toValue: 1, useNativeDriver: !IS_WEB })
-    ]).start();
-  }, [heartScale]);
+    newSocket.emit('join-pair', { pairCode: code, userRole: role });
+    newSocket.emit('load-messages', { pairCode: code });
 
-  // 🎯 Join/Create pair with gender logic
+    newSocket.on('init-data', (data) => {
+      setStatusA(data.statusA);
+      setStatusB(data.statusB);
+      setQuiz(data.quiz);
+      setPartnerSleeping(data.sleep_mode);
+    });
+
+    newSocket.on('messages-loaded', (msgs) => {
+      setMessages(msgs || []);
+      AsyncStorage.setItem(`msgs_${code}`, JSON.stringify(msgs || []));
+    });
+
+    newSocket.on('new-message', (msg) => {
+      setMessages(prev => [...prev, msg]);
+      if (!IS_WEB) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    });
+
+    newSocket.on('status-updated', (data) => {
+      if (data.field === 'status_a') setStatusA(data.mood);
+      else setStatusB(data.mood);
+    });
+
+    newSocket.on('quiz-updated', (updatedQuiz) => {
+      setQuiz(updatedQuiz);
+    });
+
+    newSocket.on('sleep-updated', (data) => {
+      if (data.userId !== userRole) {
+        setPartnerSleeping(data.active);
+      }
+    });
+  };
+
+  // ✨ CREATE PAIR
+  const handleCreatePair = async () => {
+    setLoading(true);
+    try {
+      const code = 'FEEL-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+      setPendingCode(code);
+      setGenderModalVisible(true); // ✅ ПОКАЗЫВАЕМ МОДАЛКУ
+      if (!IS_WEB) Haptics.selectionAsync();
+    } catch (e) {
+      Alert.alert('Ошибка', 'Не удалось создать пару');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 👤 SELECT GENDER - ✅ ИСПРАВЛЕНО
+  const handleGenderSelect = async (gender) => {
+    const code = pendingCode.replace('FEEL-', '');
+    const role = gender;
+    const opposite = gender === 'M' ? 'Ж' : 'M';
+    
+    console.log('🔵 Creating pair:', code, 'with role:', role);
+    
+    try {
+      // ✅ СОХРАНЯЕМ В БД
+      const { data, error } = await supabase
+        .from('pairs')
+        .insert([{ 
+          code: code,
+          gender_a: role,
+          gender_b: opposite,
+          status_a: '😊',
+          status_b: '😊',
+          quiz: { ans_a: null, ans_b: null, revealed: false },
+          sleep_mode: false
+        }])
+        .select()
+        .single();
+        
+      if (error) {
+        console.error('❌ DB Error:', error);
+        Alert.alert('Ошибка БД', error.message);
+        return;
+      }
+      
+      console.log('✅ Pair created:', data);
+      
+      // ✅ ЗАКРЫВАЕМ МОДАЛКУ
+      setGenderModalVisible(false);
+      
+      // ✅ УСТАНАВЛИВАЕМ РОЛЬ И КОД
+      setUserRole(role);
+      setPairCode('FEEL-' + code);
+      
+      // ✅ СОХРАНЯЕМ СЕССИЮ
+      await AsyncStorage.setItem('feel_in_session', JSON.stringify({ 
+        code: 'FEEL-' + code, 
+        role: role 
+      }));
+      
+      // ✅ ПЕРЕХОДИМ НА ГЛАВНЫЙ ЭКРАН
+      setScreen('main');
+      
+      // ✅ ПОДКЛЮЧАЕМ СОКЕТ
+      connectSocket('FEEL-' + code, role);
+      
+      if (!IS_WEB) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
+    } catch (e) {
+      console.error('❌ Gender select error:', e);
+      Alert.alert('Ошибка', e.message);
+    }
+  };
+
+  // 🔑 JOIN PAIR
   const handleJoinPair = async () => {
-    if (!pairCode.trim()) return;
+    if (!pairCode.trim()) return Alert.alert('Ошибка', 'Введите код');
+    setLoading(true);
     
     try {
       const cleanCode = pairCode.trim().toUpperCase().replace('FEEL-', '');
-      const { data: pair } = await supabase.current
+      
+      const { data: pair, error } = await supabase
         .from('pairs')
         .select('*')
         .eq('code', cleanCode)
         .single();
-
-      if (pair) {
-        const myGender = pair.gender_a === 'M' ? 'Ж' : 'M';
-        setUserRole(myGender);
-        setIsCreator(false);
-        await AsyncStorage.setItem('userRole', myGender);
-        await AsyncStorage.setItem('pairCode', cleanCode);
-      } else {
-        setIsCreator(true);
-        await AsyncStorage.setItem('pairCode', cleanCode);
+        
+      if (error || !pair) {
+        Alert.alert('Ошибка', 'Пара не найдена');
         return;
       }
-
-      socketRef.current.emit('join-pair', { pairCode: cleanCode, userRole: userRole || (pair ? (pair.gender_a === 'M' ? 'Ж' : 'M') : null) });
       
-      setTimeout(() => {
-        socketRef.current.emit('load-messages', { pairCode: cleanCode });
-        socketRef.current.emit('get-profiles', { pairCode: cleanCode });
-      }, 500);
-
+      // ✅ АВТОМАТИЧЕСКИ НАЗНАЧАЕМ ПРОТИВОПОЛОЖНЫЙ ПОЛ
+      const myRole = pair.gender_a === 'M' ? 'Ж' : 'M';
+      
+      setUserRole(myRole);
+      setPairCode('FEEL-' + cleanCode);
+      setScreen('main');
+      
+      await AsyncStorage.setItem('feel_in_session', JSON.stringify({ 
+        code: 'FEEL-' + cleanCode, 
+        role: myRole 
+      }));
+      
+      connectSocket('FEEL-' + cleanCode, myRole);
+      
       if (!IS_WEB) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
     } catch (e) {
-      Alert.alert(t.error, e.message);
+      Alert.alert('Ошибка', 'Не удалось подключиться');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSetGender = async (gender) => {
-    try {
-      setUserRole(gender);
-      await AsyncStorage.setItem('userRole', gender);
-      
-      const { data, error } = await supabase.current
-        .from('pairs')
-        .insert([{ 
-          code: pairCode.trim().toUpperCase().replace('FEEL-', ''),
-          gender_a: gender,
-          gender_b: gender === 'M' ? 'Ж' : 'M'
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      socketRef.current.emit('join-pair', { pairCode: pairCode.trim().toUpperCase().replace('FEEL-', ''), userRole: gender });
-      
-      setTimeout(() => {
-        socketRef.current.emit('load-messages', { pairCode: pairCode.trim().toUpperCase().replace('FEEL-', '') });
-      }, 500);
-
-      if (!IS_WEB) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (e) {
-      Alert.alert(t.error, e.message);
-    }
-  };
-
-  const handleSendMessage = useCallback(() => {
-    if (!newMessage.trim() || !pairCode || !userRole) return;
+  // 💬 SEND MESSAGE
+  const sendMessage = () => {
+    if (!inputText.trim() || !socketRef.current) return;
     
-    const tempId = `temp_${Date.now()}`;
-    const optimisticMsg = {
-      id: tempId,
-      pair_code: pairCode,
-      user_id: userRole,
-      text: newMessage.trim(),
-      created_at: new Date().toISOString(),
-      read_by_partner: false
+    const tempId = Date.now().toString();
+    const tempMsg = { 
+      id: tempId, 
+      text: inputText, 
+      user_id: userRole, 
+      created_at: new Date().toISOString() 
     };
-
-    setMessages(prev => [...prev, optimisticMsg].slice(-100));
-    setNewMessage('');
-    scrollToBottom();
+    
+    setMessages(prev => [...prev, tempMsg]);
+    setInputText('');
+    
+    socketRef.current.emit('send-message', {
+      pairCode, userId: userRole, text: tempMsg.text, tempId
+    });
     
     if (!IS_WEB) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    socketRef.current.emit('send-message', {
-      pairCode,
-      userId: userRole,
-      text: optimisticMsg.text,
-      tempId
-    });
-
-    messageQueue.current.push(optimisticMsg);
-    AsyncStorage.setItem(`message_queue_${pairCode}`, JSON.stringify(messageQueue.current));
-  }, [newMessage, pairCode, userRole]);
-
-  const handleMoodSelect = (moodKey) => {
-    setMyMood(moodKey);
-    
-    const payload = {
-      pairCode,
-      userId: userRole,
-      mood: moodKey,
-      statusField: userRole === 'M' ? 'statusA' : 'statusB'
-    };
-    
-    socketRef.current.emit('update-status', payload);
-    
-    if (!IS_WEB) {
-      Haptics.selectionAsync();
-      startHeartPulse();
-    }
   };
 
-  const handleQuizSubmit = (answer) => {
-    setMyAnswer(answer);
-    
-    const payload = {
-      pairCode,
-      userId: userRole,
-      answer,
-      answerField: userRole === 'M' ? 'ans_a' : 'ans_b'
-    };
-    
-    socketRef.current.emit('quiz-submit', payload);
-    
-    if (!IS_WEB) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  };
-
-  const handleSleepToggle = () => {
-    const newSleepState = !partnerSleeping;
-    setPartnerSleeping(newSleepState);
-    
-    socketRef.current.emit('sleep-toggle', {
-      pairCode,
-      userId: userRole,
-      sleeping: newSleepState
-    });
-    
-    if (!IS_WEB) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  };
-
-  const handleThemeChange = async (theme) => {
-    setThemeMode(theme);
-    await AsyncStorage.setItem('themeMode', theme);
+  // 💓 UPDATE MOOD
+  const updateMood = (emoji) => {
+    if (!socketRef.current) return;
+    socketRef.current.emit('update-status', { pairCode, userId: userRole, mood: emoji });
     if (!IS_WEB) Haptics.selectionAsync();
   };
 
-  const handleLangChange = async (newLang) => {
-    setLang(newLang);
-    await AsyncStorage.setItem('lang', newLang);
+  // ❓ SUBMIT QUIZ
+  const submitQuiz = (answer) => {
+    if (!socketRef.current) return;
+    socketRef.current.emit('quiz-submit', { pairCode, userId: userRole, answer });
+    if (!IS_WEB) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
-  // 🚀 Render
-  if (!userRole) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
-        <StatusBar barStyle="light-content" />
-        <View style={styles.centered}>
-          <Text style={[styles.title, { color: colors.text }]}>{t.appTitle}</Text>
-          
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-            placeholder={t.joinPair}
-            placeholderTextColor={colors.textMuted}
-            value={pairCode}
-            onChangeText={setPairCode}
-            maxLength={6}
-            autoCapitalize="characters"
-          />
-          
-          <TouchableOpacity 
-            style={[styles.button, { backgroundColor: colors.accent }]}
-            onPress={handleJoinPair}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.buttonText}>{isCreator ? t.createPair : t.joinPair}</Text>
-          </TouchableOpacity>
+  // 😴 TOGGLE SLEEP
+  const toggleSleep = () => {
+    if (!socketRef.current) return;
+    const newState = !partnerSleeping;
+    socketRef.current.emit('sleep-toggle', { pairCode, userId: userRole, active: newState });
+  };
 
-          {isCreator && (
-            <Modal visible transparent animationType="fade">
-              <View style={styles.modalOverlay}>
-                <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
-                  <Text style={[styles.modalTitle, { color: colors.text }]}>{t.selectGender}</Text>
-                  <TouchableOpacity 
-                    style={[styles.genderBtn, { borderColor: colors.secondary }]}
-                    onPress={() => handleSetGender('M')}
-                  >
-                    <Text style={styles.genderBtnText}>{t.male}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.genderBtn, { borderColor: colors.accent }]}
-                    onPress={() => handleSetGender('Ж')}
-                  >
-                    <Text style={styles.genderBtnText}>{t.female}</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </Modal>
-          )}
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (partnerSleeping) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
-        <View style={styles.sleepBlock}>
-          <Animated.Text style={[styles.sleepEmoji, { color: colors.accent }]}>{partnerSleeping ? '🌙' : '☀️'}</Animated.Text>
-          <Text style={[styles.sleepText, { color: colors.text }]}>{partnerSleeping ? t.sleepMode : t.wakeUp}</Text>
-          <TouchableOpacity 
-            style={[styles.sleepBtn, { backgroundColor: colors.secondary }]}
-            onPress={handleSleepToggle}
-          >
-            <Text style={styles.sleepBtnText}>{partnerSleeping ? t.wakeUp : t.sleepMode}</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
-      <StatusBar barStyle="light-content" />
+  // 🎨 RENDER WELCOME
+  const renderWelcome = () => (
+    <Animated.View style={[styles.center, { opacity: fadeAnim }]}>
+      {/* ✅ УБРАНЫ ЧЕЛОВЕЧКИ - ТОЛЬКО СЕРДЕЧКО */}
+      <Text style={styles.title}>Feel In 💑</Text>
+      <Text style={styles.subtitle}>Пространство для двоих</Text>
       
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1} ellipsizeMode="tail">{t.appTitle}</Text>
-        <View style={styles.statusRow}>
-          <View style={styles.statusItem}>
-            <Text style={[styles.statusLabel, { color: colors.textMuted }]}>{t.myStatus}</Text>
-            <TouchableOpacity onPress={() => handleMoodSelect(myMood || MOOD_EMOJIS[0].key)}>
-              <Text style={styles.statusEmoji}>{MOOD_EMOJIS.find(m => m.key === (userRole === 'M' ? statusA : statusB))?.emoji || '😊'}</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.statusItem}>
-            <Text style={[styles.statusLabel, { color: colors.textMuted }]}>{t.partnerStatus}</Text>
-            <View style={styles.partnerStatus}>
-              <Text style={styles.statusEmoji}>{MOOD_EMOJIS.find(m => m.key === (userRole === 'M' ? statusB : statusA))?.emoji || '😊'}</Text>
-              <View style={[styles.onlineDot, { backgroundColor: partnerOnline ? colors.success : colors.error }]} />
-            </View>
-          </View>
-        </View>
+      <View style={styles.btnContainer}>
+        <TouchableOpacity 
+          style={[styles.btn, styles.btnPrimary]} 
+          onPress={handleCreatePair} 
+          disabled={loading}
+        >
+          <Text style={styles.btnText}>{loading ? '...' : '✨ Создать пару'}</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.btn, styles.btnSecondary]} 
+          onPress={() => setScreen('join')}
+        >
+          <Text style={[styles.btnText, { color: COLORS.primary }]}>🔑 Войти по коду</Text>
+        </TouchableOpacity>
+      </View>
+    </Animated.View>
+  );
+
+  // 🎨 RENDER JOIN
+  const renderJoin = () => (
+    <View style={styles.center}>
+      <Text style={styles.title}>Вход</Text>
+      <TextInput 
+        style={styles.input}
+        placeholder="FEEL-XXXX"
+        placeholderTextColor={COLORS.textMuted}
+        value={pairCode}
+        onChangeText={setPairCode}
+        autoCapitalize="characters"
+        maxLength={12}
+      />
+      <TouchableOpacity 
+        style={[styles.btn, styles.btnPrimary]} 
+        onPress={handleJoinPair} 
+        disabled={loading}
+      >
+        <Text style={styles.btnText}>{loading ? '...' : 'Войти'}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => setScreen('welcome')} style={{marginTop: 20}}>
+        <Text style={{color: COLORS.textMuted}}>← Назад</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // 🎨 RENDER MAIN
+  const renderMain = () => (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>{pairCode}</Text>
+        <TouchableOpacity onPress={toggleSleep}>
+          <Text style={{fontSize: 24}}>{partnerSleeping ? '🌙' : '☀️'}</Text>
+        </TouchableOpacity>
       </View>
 
-      {quiz && (
-        <View style={[styles.quizCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.quizQuestion, { color: colors.text }]} numberOfLines={2} ellipsizeMode="tail">{quiz.question}</Text>
-          {!myAnswer ? (
-            <View style={styles.quizOptions}>
-              {['Да ❤️', 'Нет 💙', 'Может 🤔'].map((opt, i) => (
-                <TouchableOpacity 
-                  key={i}
-                  style={[styles.quizBtn, { backgroundColor: colors.secondary }]}
-                  onPress={() => handleQuizSubmit(opt)}
-                >
-                  <Text style={styles.quizBtnText}>{opt}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          ) : partnerAnswer ? (
-            <View style={styles.quizRevealed}>
-              <Text style={[styles.quizAnswer, { color: colors.text }]}>{t.quizRevealed}</Text>
-              <Text style={[styles.quizResult, { color: colors.accent }]}>
-                {userRole === 'M' ? `Вы: ${myAnswer} | Партнёр: ${partnerAnswer}` : `Вы: ${myAnswer} | Партнёр: ${partnerAnswer}`}
-              </Text>
-            </View>
-          ) : (
-            <Text style={[styles.quizWaiting, { color: colors.textMuted }]}>{t.quizWaiting}</Text>
-          )}
+      {partnerSleeping && (
+        <View style={styles.sleepOverlay}>
+          <Text style={{fontSize: 40, marginBottom: 10}}>🌙</Text>
+          <Text style={styles.sleepText}>Партнёр спит</Text>
+          <Text style={{color: COLORS.textMuted}}>Чат заблокирован</Text>
         </View>
       )}
+
+      <View style={styles.moodRow}>
+        {['😊', '😍', '🤗', '😢', '😤'].map(mood => (
+          <TouchableOpacity key={mood} onPress={() => updateMood(mood)} style={styles.moodBtn}>
+            <Text style={{fontSize: 24}}>{mood}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      
+      <View style={styles.statusRow}>
+        <Text style={{color: COLORS.text}}>Вы: {userRole === 'M' ? statusA : statusB || ''}</Text>
+        <Text style={{color: COLORS.text}}>Партнёр: {userRole === 'M' ? statusB : statusA || '😐'}</Text>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Вопрос дня</Text>
+        {!quiz.revealed ? (
+          <View style={styles.quizOptions}>
+            <TouchableOpacity style={styles.quizBtn} onPress={() => submitQuiz('Да')}>
+              <Text style={styles.quizText}>Да</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quizBtn} onPress={() => submitQuiz('Нет')}>
+              <Text style={styles.quizText}>Нет</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.quizResult}>
+            <Text style={{color: COLORS.primary, fontWeight: 'bold'}}>Ответы раскрыты!</Text>
+            <Text style={{color: COLORS.text}}>М: {quiz.ans_a} | Ж: {quiz.ans_b}</Text>
+          </View>
+        )}
+      </View>
 
       <FlatList
         data={messages}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <MessageItem item={item} currentUserRole={userRole} colors={colors} />}
-        contentContainerStyle={styles.chatList}
-        initialNumToRender={10}
-        maxToRenderPerBatch={5}
-        windowSize={10}
-        removeClippedSubviews={true}
-        onEndReachedThreshold={0.5}
+        renderItem={({ item }) => (
+          <View style={[
+            styles.msgBubble, 
+            item.user_id === userRole ? styles.msgMe : styles.msgPartner
+          ]}>
+            <Text style={{color: '#fff'}}>{item.text}</Text>
+          </View>
+        )}
+        style={styles.chatList}
       />
-      {typingPartner && (
-        <Text style={[styles.typingIndicator, { color: colors.textMuted }]}>Партнёр печатает...</Text>
-      )}
-      <View ref={messagesEndRef} />
 
-      <KeyboardAvoidingView behavior={IS_WEB ? 'padding' : 'height'} keyboardVerticalOffset={IS_WEB ? 0 : 10}>
-        <View style={[styles.inputRow, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
-          <TextInput
-            style={[styles.chatInput, { color: colors.text, backgroundColor: colors.bg }]}
-            placeholder={t.chatPlaceholder}
-            placeholderTextColor={colors.textMuted}
-            value={newMessage}
-            onChangeText={setNewMessage}
-            onSubmitEditing={handleSendMessage}
-            returnKeyType="send"
-            blurOnSubmit={false}
+      <KeyboardAvoidingView behavior={IS_WEB ? 'height' : 'padding'}>
+        <View style={styles.inputRow}>
+          <TextInput 
+            style={styles.chatInput}
+            placeholder="Сообщение..."
+            placeholderTextColor={COLORS.textMuted}
+            value={inputText}
+            onChangeText={setInputText}
+            editable={!partnerSleeping}
           />
           <TouchableOpacity 
-            style={[styles.sendBtn, { backgroundColor: colors.accent }]}
-            onPress={handleSendMessage}
-            disabled={!newMessage.trim()}
+            style={styles.sendBtn} 
+            onPress={sendMessage}
+            disabled={partnerSleeping}
           >
-            <Text style={styles.sendBtnText}>{t.send}</Text>
+            <Text style={{color: '#fff', fontWeight: 'bold'}}>➤</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-
-      <Animated.View 
-        style={[
-          styles.heartWidget,
-          { transform: [{ scale: heartScale }], backgroundColor: colors.accent }
-        ]}
-      >
-        <TouchableOpacity onPress={() => { startHeartPulse(); if (!IS_WEB) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); }}>
-          <Text style={styles.heartEmoji}>💓</Text>
-        </TouchableOpacity>
-      </Animated.View>
     </SafeAreaView>
+  );
+
+  return (
+    <View style={{flex: 1, backgroundColor: COLORS.bg}}>
+      {screen === 'welcome' && renderWelcome()}
+      {screen === 'join' && renderJoin()}
+      {screen === 'main' && renderMain()}
+      
+      {/* ✅ МОДАЛКА ВЫБОРА ПОЛА */}
+      <Modal 
+        visible={genderModalVisible} 
+        transparent 
+        animationType="fade"
+        onRequestClose={() => setGenderModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Выберите ваш пол</Text>
+            <TouchableOpacity 
+              style={styles.genderBtn} 
+              onPress={() => handleGenderSelect('M')}
+            >
+              <Text style={styles.genderBtnText}>👨 Мужской</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.genderBtn} 
+              onPress={() => handleGenderSelect('Ж')}
+            >
+              <Text style={styles.genderBtnText}>👩 Женский</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
+// 🎨 STYLES
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  title: { fontSize: 28, fontWeight: '800', marginBottom: 32, textAlign: 'center' },
-  input: { width: '100%', padding: 16, borderRadius: 14, fontSize: 16, marginBottom: 16, borderWidth: 1 },
-  button: { width: '100%', padding: 16, borderRadius: 14, alignItems: 'center' },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  title: { fontSize: 32, fontWeight: 'bold', color: COLORS.text, marginBottom: 10 },
+  subtitle: { fontSize: 16, color: COLORS.textMuted, marginBottom: 40 },
+  btnContainer: { width: '100%', gap: 15 },
+  btn: { width: '100%', padding: 15, borderRadius: 12, alignItems: 'center' },
+  btnPrimary: { backgroundColor: COLORS.primary },
+  btnSecondary: { backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.primary },
+  btnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  input: { width: '100%', backgroundColor: COLORS.card, color: COLORS.text, padding: 15, borderRadius: 12, marginBottom: 20, textAlign: 'center', fontSize: 20 },
   
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: '80%', padding: 24, borderRadius: 20, alignItems: 'center' },
-  modalTitle: { fontSize: 20, fontWeight: '700', marginBottom: 20 },
-  genderBtn: { width: '100%', padding: 14, borderRadius: 12, alignItems: 'center', marginBottom: 12, borderWidth: 2 },
-  genderBtnText: { fontSize: 16, fontWeight: '600' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', padding: 15, borderBottomWidth: 1, borderColor: COLORS.border },
+  headerTitle: { color: COLORS.text, fontSize: 18, fontWeight: 'bold' },
   
-  header: { padding: 16, borderBottomWidth: 1 },
-  headerTitle: { fontSize: 20, fontWeight: '800', textAlign: 'center', marginBottom: 12 },
-  statusRow: { flexDirection: 'row', justifyContent: 'space-around' },
-  statusItem: { alignItems: 'center' },
-  statusLabel: { fontSize: 12, marginBottom: 4 },
-  statusEmoji: { fontSize: 28 },
-  partnerStatus: { position: 'relative' },
-  onlineDot: { position: 'absolute', bottom: 2, right: 0, width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: '#fff' },
+  moodRow: { flexDirection: 'row', justifyContent: 'space-around', padding: 15, backgroundColor: COLORS.card, margin: 10, borderRadius: 12 },
+  moodBtn: { padding: 10 },
+  statusRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 10 },
   
-  quizCard: { margin: 16, padding: 16, borderRadius: 16, borderWidth: 1 },
-  quizQuestion: { fontSize: 16, fontWeight: '600', marginBottom: 12, textAlign: 'center' },
-  quizOptions: { flexDirection: 'row', justifyContent: 'space-around' },
-  quizBtn: { padding: 10, borderRadius: 10, minWidth: 70, alignItems: 'center' },
-  quizBtnText: { color: '#fff', fontWeight: '600' },
-  quizRevealed: { alignItems: 'center' },
-  quizAnswer: { fontSize: 14, marginBottom: 8 },
-  quizResult: { fontSize: 16, fontWeight: '700' },
-  quizWaiting: { textAlign: 'center', fontStyle: 'italic' },
+  card: { backgroundColor: COLORS.card, margin: 10, padding: 15, borderRadius: 12 },
+  cardTitle: { color: COLORS.text, fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
+  quizOptions: { flexDirection: 'row', gap: 10 },
+  quizBtn: { flex: 1, backgroundColor: COLORS.secondary, padding: 10, borderRadius: 8, alignItems: 'center' },
+  quizText: { color: '#fff', fontWeight: 'bold' },
+  quizResult: { alignItems: 'center' },
   
-  chatList: { padding: 12, flexGrow: 1 },
-  messageBubble: { maxWidth: '75%', padding: 12, borderRadius: 18, marginBottom: 8, alignSelf: 'flex-end' },
-  messageMine: { alignSelf: 'flex-end', borderBottomRightRadius: 4 },
-  messagePartner: { alignSelf: 'flex-start', borderBottomLeftRadius: 4 },
-  messageText: { fontSize: 15, lineHeight: 20 },
-  messageTime: { fontSize: 10, marginTop: 4, textAlign: 'right' },
+  chatList: { flex: 1, padding: 10 },
+  msgBubble: { maxWidth: '80%', padding: 10, borderRadius: 12, marginBottom: 5 },
+  msgMe: { alignSelf: 'flex-end', backgroundColor: COLORS.primary },
+  msgPartner: { alignSelf: 'flex-start', backgroundColor: COLORS.secondary },
   
-  inputRow: { flexDirection: 'row', padding: 12, borderTopWidth: 1, alignItems: 'center' },
-  chatInput: { flex: 1, padding: 12, borderRadius: 20, fontSize: 15, maxHeight: 100 },
-  sendBtn: { marginLeft: 8, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 20 },
-  sendBtnText: { color: '#fff', fontWeight: '700' },
+  inputRow: { flexDirection: 'row', padding: 10, borderTopWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.bg },
+  chatInput: { flex: 1, backgroundColor: COLORS.card, color: COLORS.text, borderRadius: 20, paddingHorizontal: 15, marginRight: 10 },
+  sendBtn: { width: 40, height: 40, backgroundColor: COLORS.primary, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
   
-  typingIndicator: { paddingHorizontal: 16, paddingVertical: 4, fontSize: 12, fontStyle: 'italic' },
+  sleepOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center', zIndex: 100 },
+  sleepText: { fontSize: 24, color: COLORS.text, fontWeight: 'bold', marginBottom: 10 },
   
-  heartWidget: { position: 'absolute', top: 20, right: 20, width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6 },
-  heartEmoji: { fontSize: 24 },
-  
-  sleepBlock: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  sleepEmoji: { fontSize: 64, marginBottom: 24 },
-  sleepText: { fontSize: 20, fontWeight: '600', marginBottom: 24, textAlign: 'center' },
-  sleepBtn: { paddingVertical: 14, paddingHorizontal: 32, borderRadius: 14 },
-  sleepBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' }
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { backgroundColor: COLORS.card, padding: 30, borderRadius: 20, width: '80%', alignItems: 'center' },
+  modalTitle: { color: COLORS.text, fontSize: 20, fontWeight: 'bold', marginBottom: 20 },
+  genderBtn: { width: '100%', padding: 15, backgroundColor: COLORS.secondary, borderRadius: 10, marginBottom: 10, alignItems: 'center' },
+  genderBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
 });

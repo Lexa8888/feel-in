@@ -69,7 +69,7 @@ export default function App() {
     });
 
     newSocket.on('joined', () => {
-      console.log('✅ Joined room, loading messages...');
+      console.log('✅ Joined room');
       newSocket.emit('load-messages', { pairCode: code.replace('FEEL-', '') });
     });
     
@@ -89,7 +89,10 @@ export default function App() {
       else setPartnerMood(data.value);
     });
     
-    newSocket.on('disconnect', () => setConnected(false));
+    newSocket.on('disconnect', () => {
+      console.log('❌ Socket disconnected');
+      setConnected(false);
+    });
   };
 
   const createPair = async () => {
@@ -118,23 +121,36 @@ export default function App() {
     
     try {
       setLoading(true);
-      console.log('🔍 Searching for:', cleanCode);
-      const { data: pair, error } = await supabase.from('pairs').select('*').eq('code', cleanCode).single();
+      console.log('🔍 Searching for code:', cleanCode);
       
-      if (error || !pair) {
-        console.error('❌ Not found or error:', error);
-        Alert.alert('Ошибка входа', `Код "${cleanCode}" не найден. Проверьте правильность.`);
+      const {  pair, error } = await supabase
+        .from('pairs')
+        .select('*')
+        .eq('code', cleanCode)
+        .single();
+      
+      console.log('📡 Response:', { pair, error });
+      
+      // ПРОВЕРКА: если пары нет
+      if (!pair) {
+        Alert.alert('Ошибка входа', `Пара с кодом "${cleanCode}" не найдена.\n\nПроверьте правильность ввода кода.`);
+        setLoading(false);
         return;
       }
       
-      console.log('✅ Found pair, joining...');
+      console.log('✅ Pair found! Joining...');
       await AsyncStorage.setItem('feel_session', JSON.stringify({ code: fullCode, role: 'Ж' }));
       setPairCode(fullCode);
       setUserRole('Ж');
       setScreen('main');
       setTimeout(() => initSocket(fullCode, 'Ж'), 100);
-    } catch (e) { Alert.alert('Ошибка', e.message); }
-    finally { setLoading(false); }
+      
+    } catch (e) { 
+      console.error('❌ Error:', e);
+      Alert.alert('Ошибка', e.message); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const sendMessage = () => {

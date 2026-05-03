@@ -33,7 +33,13 @@ io.on('connection', (socket) => {
       
       // Load initial statuses
       const { data } = await supabase.from('pairs').select('status_a, status_b').eq('code', pairCode).single();
-      if (data) socket.emit('init-status', { statusA: data.status_a, statusB: status_b });
+      if (data) {
+        // ✅ ИСПРАВЛЕНО: data.status_b вместо status_b
+        socket.emit('init-status', { 
+          statusA: data.status_a, 
+          statusB: data.status_b 
+        });
+      }
     } catch (err) {
       console.error('❌ join-pair error:', err.message);
     }

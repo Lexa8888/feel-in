@@ -184,6 +184,22 @@ io.on('connection', (socket) => {
         .eq('code', code);
       
       io.to(code).emit('status-updated', { user, value });
+      
+      // Send push notification to partner
+      const partner = user === 'M' ? 'Ж' : 'M';
+      const token = userPushTokens[code]?.[partner];
+      if (token) {
+        const expo = require('expo-server-sdk');
+        if (expo.Expo.isExpoPushToken(token)) {
+          new expo.Expo().sendPushNotificationsAsync([{
+            to: token,
+            sound: 'default',
+            title: '💕 Mood',
+            body: `Партнёр: ${value}`,
+            data: { code, type: 'status' }
+          }]).catch(e => console.error('Push err:', e));
+        }
+      }
     } catch (e) { 
       console.error('Status err:', e); 
     }
@@ -387,6 +403,22 @@ io.on('connection', (socket) => {
         .eq('code', pairCode);
       
       io.to(pairCode).emit('sleep-updated', { active, user, sleepUntil });
+      
+      // Send push notification to partner
+      const partner = user === 'M' ? 'Ж' : 'M';
+      const token = userPushTokens[pairCode]?.[partner];
+      if (token) {
+        const expo = require('expo-server-sdk');
+        if (expo.Expo.isExpoPushToken(token)) {
+          new expo.Expo().sendPushNotificationsAsync([{
+            to: token,
+            sound: 'default',
+            title: active ? '🌙 Партнёр уснул' : '☀️ Партнёр проснулся',
+            body: active ? 'Приятных снов! Чат заблокирован до утра 💤' : 'Доброе утро! Чат снова доступен 🌞',
+            data: { type: 'sleep', active, pairCode }
+          }]).catch(e => console.error('Push err:', e));
+        }
+      }
     } catch (e) { 
       console.error('Sleep toggle err:', e); 
     }
@@ -415,35 +447,46 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// ✅ CREATE PAIR ENDPOINT
 app.post('/api/pair/create', async (req, res) => {
   try {
-    let code, data, error, att = 0;
+    let code, data, error, attempts = 0;
     
     do {
       code = 'FEEL-' + Math.random().toString(36).substring(2, 6).toUpperCase();
-      const r = await supabase
+      const result = await supabase
         .from('pairs')
         .insert({ 
-          id: Date.now().toString(), 
           code, 
-          streak: 0 
+          streak: 0,
+          status_a: '😊',
+          status_b: '😊',
+          quiz: { ans_a: null, ans_b: null, revealed: false },
+          sleep_mode: false,
+          diary: [],
+          peace: { active: false, from: null, timestamp: null }
         })
         .select()
         .single();
       
-      data = r.data; 
-      error = r.error; 
-      att++;
-    } while (error?.code === '23505' && att < 5);
+      data = result.data;
+      error = result.error;
+      attempts++;
+    } while (error?.code === '23505' && attempts < 5); // Unique constraint
     
-    if (error) throw error;
+    if (error) {
+      console.error('Create pair error:', error);
+      throw error;
+    }
     
     res.json({ success: true, code, pairId: data.id });
   } catch (e) { 
+    console.error('Create pair exception:', e);
     res.status(500).json({ error: e.message }); 
   }
 });
 
+// ✅ JOIN PAIR ENDPOINT
 app.post('/api/pair/join', async (req, res) => {
   try {
     const { code } = req.body;
@@ -455,11 +498,12 @@ app.post('/api/pair/join', async (req, res) => {
       .single();
     
     if (error || !pair) {
-      return res.status(404).json({ error: 'Not found' });
+      return res.status(404).json({ error: 'Pair not found' });
     }
     
     res.json({ success: true, pair, pairId: pair.id });
   } catch (e) { 
+    console.error('Join pair error:', e);
     res.status(500).json({ error: e.message }); 
   }
 });
@@ -470,8 +514,11 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
 
-process.on('unhandledRejection', (r) => console.error('❌ Unhandled:', r));
-process.on('uncaughtException', (e) => { 
-  console.error('❌ Exception:', e); 
-  process.exit(1); 
+process.on('unhandledRejection', (reason) => {
+  console.error('❌ Unhandled Rejection:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+  process.exit(1);
 });

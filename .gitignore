@@ -42,4 +42,7 @@ web-build/
 
 # EAS
 .eas/
-artifacts/
+artifacts/feel-in-backup.zip
+*.zip
+*.bak
+node_modules/

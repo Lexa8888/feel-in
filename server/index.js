@@ -1,121 +1,245 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const helmet = require('helmet');
 const { createClient } = require('@supabase/supabase-js');
 const http = require('http');
-const socketIo = require('socket.io');
-const rateLimit = require('express-rate-limit');
+const { Server } = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server, { cors: { origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], credentials: true } });
-
-app.use(helmet());
-app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], credentials: true }));
-app.use('/api/', rateLimit({ windowMs: 15 * 60 * 1000, max: 100, message: { error: 'Слишком много запросов.' } }));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
-
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
-
-const pairSockets = {};
-
-app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
-
-app.post('/api/pair/create', async (req, res) => {
-  try {
-    let code, result, attempts = 0;
-    do {
-      code = 'FEEL-' + Math.random().toString(36).substring(2, 6).toUpperCase();
-      result = await supabase.from('pairs').insert([{ id: Date.now().toString(), code, streak: 0 }]).select().single();
-      attempts++;
-    } while (result.error && result.error.code === '23505' && attempts < 5);
-    if (result.error) throw result.error;
-    res.json({ success: true, code, pairId: result.data.id });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+const io = new Server(server, {
+  cors: { origin: '*', methods: ['GET', 'POST'] },
+  pingTimeout: 60000,
+  pingInterval: 25000
 });
 
-app.post('/api/pair/join', async (req, res) => {
-  try {
-    let { code } = req.body;
-    code = code.trim().toUpperCase();
-    if (!code.startsWith('FEEL-')) code = 'FEEL-' + code.replace('FEEL-', '');
-    const { data: pair, error } = await supabase.from('pairs').select('*').eq('code', code).single();
-    if (error || !pair) return res.status(404).json({ error: 'Пара не найдена' });
-    res.json({ success: true, pair, pairId: pair.id });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+// ✅ CONFIG с вашими данными
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lslsvzpraiobchxvncdo.supabase.co';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'sb_publishable_r8KH-Zuqv-j5mS4DDjDQZw_RtG81TcK';
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error('❌ Missing Supabase credentials!');
+  process.exit(1);
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: false }
 });
 
-app.post('/api/user/delete', async (req, res) => {
-  try {
-    const { pairCode } = req.body;
-    await supabase.from('pairs').delete().eq('code', pairCode);
-    res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
+const pairRooms = new Map();
 
 io.on('connection', (socket) => {
-  console.log('🔌 Connected:', socket.id);
+  console.log('✅ Client connected:', socket.id);
 
-  socket.on('join-pair', (code) => {
-    socket.join(code);
-    pairSockets[socket.id] = code;
-    console.log(`👥 ${socket.id} joined ${code}`);
-  });
-
-  // ✅ ИСПРАВЛЕНО: Настроение теперь правильно мапится на status_a / status_b
-  socket.on('update-status', async ({ code, user, value }) => {
-    console.log(`📊 Status: ${user} -> ${value}`);
-    const field = user === 'M' ? 'status_a' : 'status_b';
-    await supabase.from('pairs').update({ [field]: value, updated_at: new Date().toISOString() }).eq('code', code);
-    io.to(code).emit('status-updated', { user, value });
-  });
-
-  // ✅ ИСПРАВЛЕНО: Викторина теперь корректно сохраняет ответы обоих и открывает их
-  socket.on('quiz-submit', async ({ code, user, ans }) => {
-    console.log(`📝 Quiz: ${user} answered: ${ans}`);
-    const { data: pair } = await supabase.from('pairs').select('quiz').eq('code', code).single();
-    const currentQuiz = pair?.quiz || {};
-    const field = user === 'M' ? 'ans_a' : 'ans_b';
-    currentQuiz[field] = ans;
-    currentQuiz.question = currentQuiz.question || 'Daily';
-    currentQuiz.revealed = !!(currentQuiz.ans_a && currentQuiz.ans_b);
+  socket.on('join-pair', async ({ pairCode, userRole }) => {
+    if (!pairCode || !userRole) return;
     
-    await supabase.from('pairs').update({ quiz: currentQuiz, updated_at: new Date().toISOString() }).eq('code', code);
-    io.to(code).emit('quiz-updated', { quiz: currentQuiz, updatedBy: user });
+    const room = pairCode.toUpperCase().replace('FEEL-', '');
+    
+    socket.rooms.forEach(r => { if (r !== socket.id) socket.leave(r); });
+    socket.join(room);
+    pairRooms.set(socket.id, room);
+    
+    console.log(`🔗 ${socket.id} joined room ${room} as ${userRole}`);
+    io.to(room).emit('partner-connected', { userRole });
+    
+    try {
+      const { data: pair } = await supabase
+        .from('pairs')
+        .select('*')
+        .eq('code', room)
+        .single();
+      
+      if (pair) {
+        socket.emit('status-updated', { 
+          statusA: pair.status_a, 
+          statusB: pair.status_b,
+          userRole: pair.gender_a
+        });
+        socket.emit('quiz-updated', { quiz: pair.quiz });
+        socket.emit('sleep-updated', { sleeping: pair.sleep_mode, userRole: pair.gender_a });
+        socket.emit('peace-updated', { active: pair.peace_active });
+      }
+    } catch (e) { console.error('Pair fetch error:', e); }
   });
 
-  // ✅ ИСПРАВЛЕНО: Кнопка "Мир" теперь работает и рассылается обоим
-  socket.on('peace-request', async ({ code, user }) => {
-    console.log(`🕊️ Peace: ${user}`);
-    await supabase.from('pairs').update({ peace_active: true, peace_from: user, updated_at: new Date().toISOString() }).eq('code', code);
-    io.to(code).emit('peace-updated', { active: true, from: user });
+  socket.on('send-message', async ({ pairCode, userId, text, tempId }) => {
+    if (!pairCode || !userId || !text) return;
+    
+    const room = pairCode.toUpperCase().replace('FEEL-', '');
+    
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .insert([{
+          pair_code: room,
+          user_id: userId,
+          text: text.trim(),
+          read_by_partner: false,
+          created_at: new Date().toISOString()
+        }])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      socket.to(room).emit('new-message', data);
+      socket.emit('message-sent', { tempId, realId: data.id });
+      
+    } catch (e) {
+      console.error('Message save error:', e);
+      socket.emit('message-error', { tempId, error: e.message });
+    }
   });
 
-  // ✅ ИСПРАВЛЕНО: Ритуалы сохраняются в общую историю и синхронизируются
-  socket.on('complete-ritual', async ({ code, user, text }) => {
-    console.log(`✨ Ritual: ${user} -> ${text}`);
-    const { data: pair } = await supabase.from('pairs').select('streak, ritual_a, ritual_b').eq('code', code).single();
-    const field = user === 'M' ? 'ritual_a' : 'ritual_b';
-    const other = user === 'M' ? 'ritual_b' : 'ritual_a';
-    const newStreak = pair?.[other] ? (pair.streak || 0) + 1 : (pair.streak || 0);
+  socket.on('load-messages', async ({ pairCode }) => {
+    if (!pairCode) return;
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('pair_code', pairCode.toUpperCase().replace('FEEL-', ''))
+        .order('created_at', { ascending: true })
+        .limit(100);
+      
+      if (error) throw error;
+      socket.emit('messages-loaded', { messages: data || [] });
+    } catch (e) { console.error('Load messages error:', e); }
+  });
+
+  socket.on('update-status', async ({ pairCode, userId, mood, statusField }) => {
+    if (!pairCode || !userId || !mood) return;
     
-    await supabase.from('pairs').update({ [field]: text, streak: newStreak, last_ritual: new Date().toISOString().split('T')[0], updated_at: new Date().toISOString() }).eq('code', code);
+    const room = pairCode.toUpperCase().replace('FEEL-', '');
+    const field = statusField;
     
-    const entry = { id: Date.now().toString(), user, text, date: new Date().toISOString() };
-    await supabase.from('rituals').insert(entry);
-    io.to(code).emit('ritual-updated', { ...entry, streak: newStreak });
+    try {
+      const { error } = await supabase
+        .from('pairs')
+        .update({ [field]: mood, updated_at: new Date().toISOString() })
+        .eq('code', room);
+      
+      if (error) throw error;
+      
+      io.to(room).emit('status-updated', { 
+        [field]: mood, 
+        userRole: userId,
+        mood 
+      });
+      
+    } catch (e) { console.error('Status update error:', e); }
+  });
+
+  socket.on('quiz-submit', async ({ pairCode, userId, answer, answerField }) => {
+    if (!pairCode || !userId || !answer) return;
+    
+    const room = pairCode.toUpperCase().replace('FEEL-', '');
+    
+    try {
+      const { data: pair } = await supabase
+        .from('pairs')
+        .select('quiz')
+        .eq('code', room)
+        .single();
+      
+      const currentQuiz = pair?.quiz || {};
+      const updatedQuiz = {
+        ...currentQuiz,
+        [answerField]: answer,
+        revealed: !!(answerField === 'ans_a' ? currentQuiz.ans_b : currentQuiz.ans_a)
+      };
+      
+      const { error } = await supabase
+        .from('pairs')
+        .update({ quiz: updatedQuiz, updated_at: new Date().toISOString() })
+        .eq('code', room);
+      
+      if (error) throw error;
+      
+      io.to(room).emit('quiz-updated', { 
+        quiz: updatedQuiz,
+        userRole: userId 
+      });
+      
+    } catch (e) { console.error('Quiz update error:', e); }
+  });
+
+  socket.on('sleep-toggle', async ({ pairCode, userId, sleeping }) => {
+    if (!pairCode) return;
+    
+    const room = pairCode.toUpperCase().replace('FEEL-', '');
+    
+    try {
+      const { error } = await supabase
+        .from('pairs')
+        .update({ sleep_mode: sleeping, updated_at: new Date().toISOString() })
+        .eq('code', room);
+      
+      if (error) throw error;
+      
+      io.to(room).emit('sleep-updated', { 
+        sleeping, 
+        userRole: userId 
+      });
+      
+    } catch (e) { console.error('Sleep toggle error:', e); }
+  });
+
+  socket.on('peace-request', async ({ pairCode, fromUser }) => {
+    if (!pairCode) return;
+    const room = pairCode.toUpperCase().replace('FEEL-', '');
+    
+    try {
+      const { error } = await supabase
+        .from('pairs')
+        .update({ peace_active: true, updated_at: new Date().toISOString() })
+        .eq('code', room);
+      
+      if (error) throw error;
+      io.to(room).emit('peace-updated', { active: true, fromUser });
+    } catch (e) { console.error('Peace error:', e); }
+  });
+
+  socket.on('typing-start', ({ pairCode }) => {
+    if (pairCode) socket.to(pairCode.toUpperCase().replace('FEEL-', '')).emit('partner-typing');
+  });
+  socket.on('typing-stop', ({ pairCode }) => {
+    if (pairCode) socket.to(pairCode.toUpperCase().replace('FEEL-', '')).emit('partner-stopped-typing');
   });
 
   socket.on('disconnect', () => {
-    const pid = pairSockets[socket.id];
-    if (pid) socket.leave(pid);
-    delete pairSockets[socket.id];
+    const room = pairRooms.get(socket.id);
+    if (room) {
+      io.to(room).emit('partner-disconnected');
+      pairRooms.delete(socket.id);
+    }
+    console.log('❌ Client disconnected:', socket.id);
+  });
+});
+
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    supabase: 'configured',
+    credentials: {
+      url: SUPABASE_URL,
+      key: SUPABASE_ANON_KEY ? '***' : 'missing'
+    }
   });
 });
 
 const PORT = process.env.PORT || 10000;
-server.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server on ${PORT}`));
+server.listen(PORT, '0.0.0.0', () => {
+  console.log('🚀 Server running on port', PORT);
+  console.log('📊 Supabase URL:', SUPABASE_URL);
+  console.log('🔑 Supabase Key:', SUPABASE_ANON_KEY ? '***configured***' : 'MISSING!');
+});
+
+process.on('SIGTERM', () => {
+  console.log('🛑 SIGTERM received');
+  server.close(() => {
+    console.log('✅ Server closed');
+    process.exit(0);
+  });
+});

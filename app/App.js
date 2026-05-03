@@ -22,7 +22,6 @@ const CONFIG = { SERVER_URL: 'https://feel-in.onrender.com', SUPABASE_URL: 'http
 const { width } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
 
-// ✅ ИСПРАВЛЕНО 3: Полные и понятные советы
 const MOOD_RECOMMENDATIONS = {
   happy: ["📸 Скинь партнёру фото момента", "📅 Запланируйте свидание", "💌 Напишите, что вас радует"],
   sad: ["💓 Отправьте пульс любви", "💌 Напишите тёплое сообщение", "🤗 Попросите поддержки"],
@@ -143,6 +142,7 @@ function AppContent() {
   const [showGenderModal, setShowGenderModal] = useState(false);
   const [pendingPairData, setPendingPairData] = useState(null);
   const [showSyncMessage, setShowSyncMessage] = useState(false);
+  const [creatorGender, setCreatorGender] = useState(null); // ✅ Для авто-назначения пола
   
   const colors = themes[themeMode] || themes.dark;
   const t = useCallback((key) => translations[lang][key] || key, [lang]);
@@ -163,6 +163,7 @@ function AppContent() {
   const secureDel = async (key) => IS_WEB ? AsyncStorage.removeItem(key) : SecureStore.deleteItemAsync(key);
   const triggerConfetti = useCallback(() => { setShowConfetti(true); setTimeout(() => setShowConfetti(false), 2500); }, []);
 
+  // ✅ АВТОСКРОЛЛ ЧАТА
   useEffect(() => { if (chatListRef.current && messages.length > 0) setTimeout(() => { chatListRef.current.scrollToEnd({ animated: true }); }, 100); }, [messages]);
 
   useEffect(() => {
@@ -198,22 +199,43 @@ function AppContent() {
       const newSocket = io(CONFIG.SERVER_URL, { transports: ['websocket', 'poll'], reconnection: true, reconnectionDelay: 1000, timeout: 20000 });
       
       newSocket.on('connect', () => {
+        console.log('✅ Socket connected, joining pair:', code);
         setIsOnline(true);
         newSocket.emit('join-pair', code);
-        newSocket.emit('get-profiles', { pairCode: code });
-        newSocket.emit('load-messages', { pairCode: code });
+        // ✅ Загружаем сообщения сразу после входа в комнату
+        setTimeout(() => {
+          newSocket.emit('load-messages', { pairCode: code });
+          newSocket.emit('get-profiles', { pairCode: code });
+        }, 500);
         if (myNickname) newSocket.emit('update-profile', { pairCode: code, user: userRole, nickname: myNickname, avatarColor: myAvatarColor });
       });
       
       newSocket.on('disconnect', () => { setIsOnline(false); setPartnerOnline(false); });
       newSocket.on('connect_error', () => { setIsOnline(false); });
       
-      newSocket.on('profiles-loaded', (p) => { if(!p) return; const me=p.find(x=>x.user_id===userRole), ot=p.find(x=>x.user_id!==userRole); if(me){setMyNickname(me.nickname||'Я');setMyAvatarColor(me.avatar_color||AVATAR_COLORS[0]);} if(ot){setPartnerNickname(ot.nickname||'Партнёр');setPartnerAvatarColor(ot.avatar_color||AVATAR_COLORS[1]);} });
-      newSocket.on('messages-loaded', (m) => { setMessages(m || []); AsyncStorage.setItem('chatMessages', JSON.stringify(m || [])); });
+      newSocket.on('profiles-loaded', (p) => { 
+        if(!p) return; 
+        const me=p.find(x=>x.user_id===userRole), ot=p.find(x=>x.user_id!==userRole); 
+        if(me){setMyNickname(me.nickname||'Я');setMyAvatarColor(me.avatar_color||AVATAR_COLORS[0]);} 
+        if(ot){setPartnerNickname(ot.nickname||'Партнёр');setPartnerAvatarColor(ot.avatar_color||AVATAR_COLORS[1]);} 
+      });
+      
+      // ✅ ИСПРАВЛЕНО 2: Чат грузится и принимает сообщения стабильно
+      newSocket.on('messages-loaded', (m) => { 
+        console.log('💬 Messages loaded:', m?.length || 0);
+        setMessages(m || []); 
+        AsyncStorage.setItem('chatMessages', JSON.stringify(m || [])); 
+      });
       
       newSocket.on('new-message', async (msg) => {
+        console.log('📨 New message received:', msg);
         if (!msg) return;
-        setMessages(prev => { const f = (prev || []).filter(x => !x.temp || x.id === msg.id); const u = [...f, msg]; AsyncStorage.setItem('chatMessages', JSON.stringify(u)); return u; });
+        setMessages(prev => { 
+          const f = (prev || []).filter(x => !x.temp || x.id === msg.id); 
+          const u = [...f, msg]; 
+          AsyncStorage.setItem('chatMessages', JSON.stringify(u)); 
+          return u; 
+        });
         if (msg.user_id !== userRole) {
           newSocket.emit('mark-read', { pairCode: code, messageId: msg.id, reader: userRole });
           if (!IS_WEB) {
@@ -224,12 +246,15 @@ function AppContent() {
         }
       });
 
-      newSocket.on('message-sent', (msg) => { if(!msg) return; setMessages(prev=>{const f=(prev||[]).filter(x=>!x.temp),u=[...f,msg];AsyncStorage.setItem('chatMessages',JSON.stringify(u));return u;}); checkAchievements(); });
+      newSocket.on('message-sent', (msg) => { 
+        if(!msg) return; 
+        setMessages(prev=>{const f=(prev||[]).filter(x=>!x.temp),u=[...f,msg];AsyncStorage.setItem('chatMessages',JSON.stringify(u));return u;}); 
+        checkAchievements(); 
+      });
       newSocket.on('message-read', (d) => { if(!d||!d.messageId) return; setMessages(p=>(p||[]).map(m=>m.id===d.messageId?{...m,read_by_partner:true}:m)); });
       newSocket.on('partner-typing', (d)=>{if(!d)return;setPartnerTyping(d.nickname||'Партнёр');});
       newSocket.on('partner-stopped-typing', ()=>setPartnerTyping(''));
       
-      // ✅ ИСПРАВЛЕНО 2: Настроение синхронизируется чётко по ролям
       newSocket.on('status-updated', (d) => {
         if (!d || !d.user) return;
         if (d.user === 'M') setStatusA(d.value);
@@ -243,14 +268,13 @@ function AppContent() {
       });
       newSocket.on('streak-updated', (d) => { if(!d||d.streak===undefined)return; setStreak(d.streak); AsyncStorage.setItem('ritualStreak',d.streak.toString()); checkAchievements(); });
       
-      // ✅ ИСПРАВЛЕНО 4: Режим сна работает стабильно
+      // ✅ ИСПРАВЛЕНО 4: Режим сна блокирует чат корректно
       newSocket.on('sleep-updated', (p) => { 
         if(!p || !p.user) return; 
         if (p.user === userRole) setMySleeping(p.active === true);
         else setPartnerSleeping(p.active === true);
       });
       
-      // ✅ ИСПРАВЛЕНО 1: Викторина синхронизируется корректно
       newSocket.on('quiz-updated', ({ quiz }) => {
         if (!quiz) return;
         const today = new Date().toDateString();
@@ -296,35 +320,45 @@ function AppContent() {
     } else { pulseAnim.setValue(1); }
   }, [statusA, statusB, streak, messages?.length, userRole]);
 
+  // ✅ ИСПРАВЛЕНО 3: Авто-назначение противоположного пола
   const handleJoinWithGender = useCallback(async (gender) => {
     if (!pendingPairData) return;
     setLoading(true);
     try {
       const { code, isNew } = pendingPairData;
+      let finalGender = gender;
+      
+      if (!isNew && creatorGender) {
+        // Если входит второй пользователь, автоматически назначаем противоположный пол
+        finalGender = creatorGender === 'M' ? 'Ж' : 'M';
+        console.log(`🔄 Auto-assigning opposite gender: ${finalGender}`);
+      } else if (isNew) {
+        setCreatorGender(gender);
+      }
+      
       if (isNew) {
-        setPairCode(code); setUserRole(gender); setCurrentScreen('main');
-        await secureSet('pairData', JSON.stringify({pairCode: code, userRole: gender, timestamp: Date.now()}));
+        setPairCode(code); setUserRole(finalGender); setCurrentScreen('main');
+        await secureSet('pairData', JSON.stringify({pairCode: code, userRole: finalGender, timestamp: Date.now()}));
         if(!await AsyncStorage.getItem('relationshipStart')) await AsyncStorage.setItem('relationshipStart', new Date().toISOString());
         connectSocket(code);
       } else {
         const r = await fetch(`${CONFIG.SERVER_URL}/api/pair/join`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code}) });
         if(!r.ok) throw new Error('Server Error');
         const d = await r.json();
-        setPairCode(d.pair.code); setUserRole(gender); setCurrentScreen('main');
-        await secureSet('pairData', JSON.stringify({pairCode: d.pair.code, userRole: gender, timestamp: Date.now()}));
+        setPairCode(d.pair.code); setUserRole(finalGender); setCurrentScreen('main');
+        await secureSet('pairData', JSON.stringify({pairCode: d.pair.code, userRole: finalGender, timestamp: Date.now()}));
         connectSocket(d.pair.code);
         setPartnerOnline(true); setShowSyncMessage(true); setTimeout(() => setShowSyncMessage(false), 3000);
       }
       setShowGenderModal(false); setPendingPairData(null);
     } catch(e) { Alert.alert('Ошибка', 'Не удалось.'); } finally { setLoading(false); }
-  }, [pendingPairData]);
+  }, [pendingPairData, creatorGender]);
 
   if(showPinScreen) return (<SafeAreaView style={[styles.safeArea,{backgroundColor:colors.bg}]}><View style={styles.pinContainer}><Text style={styles.pinIcon}>🔐</Text><Text style={[styles.pinTitle,{color:colors.text}]}>{t('protection')}</Text><View style={styles.pinInputContainer}>{[0,1,2,3].map(i => <View key={i} style={[styles.pinDot,{backgroundColor:pinInput.length>i?colors.primary:colors.bgCard}]}/>)}</View><TextInput style={styles.pinInputHidden} value={pinInput} onChangeText={setPinInput} keyboardType="number-pad" maxLength={4} autoFocus onSubmitEditing={()=>{if(pinCode&&pinInput===pinCode){setShowPinScreen(false);setPinInput('');}else Alert.alert('Неверный PIN');}}/><TouchableOpacity onPress={()=>setShowPinScreen(false)} style={{marginTop:30}}><Text style={[styles.pinCancel,{color:colors.textSecondary}]}>{t('cancel')}</Text></TouchableOpacity></View></SafeAreaView>);
   if(!isInitialized) return (<View style={[styles.loading,{backgroundColor:colors.bg}]}><ActivityIndicator size="large" color={colors.primary}/><Text style={[styles.loadingText,{color:colors.text}]}>Загрузка...</Text></View>);
   if(hasError) return (<View style={[styles.errorContainer,{backgroundColor:colors.bg}]}><Text style={styles.errorIcon}>😕</Text><Text style={[styles.errorTitle,{color:colors.text}]}>{t('welcome')}</Text><GradientButton onPress={()=>setHasError(false)} title="Перезапустить" colors={[colors.primary, '#ff6b9d']} /></View>);
   if(!hasSeenOnboarding) return (<SafeAreaView style={[styles.safeArea,{backgroundColor:colors.bg}]}><View style={styles.onboardingContainer}><Animated.View style={{opacity:fadeIn,transform:[{scale:fadeIn}]}}><Text style={styles.onboardingIcon}>💕</Text><Text style={[styles.onboardingTitle,{color:colors.text}]}>{t('welcome')}</Text><Text style={[styles.onboardingDesc,{color:colors.textSecondary}]}>Feel In — личное пространство только для вас двоих.</Text><View style={styles.dots}><View style={[styles.dot,{backgroundColor:colors.primary,width:24}]}/></View><GradientButton onPress={()=>{setHasSeenOnboarding(true);AsyncStorage.setItem('hasSeenOnboarding','true');}} title="Начать" colors={[colors.primary,'#ff6b9d']} style={{marginTop:20}} /></Animated.View></View></SafeAreaView>);
 
-  // ✅ ИСПРАВЛЕНО 2: Динамическое отображение статусов
   const myStatus = userRole === 'M' ? statusA : statusB;
   const partnerStatus = userRole === 'M' ? statusB : statusA;
   const moodRecommendations = myStatus ? MOOD_RECOMMENDATIONS[MOOD_EMOJIS.find(m => m.emoji === myStatus)?.key] || [] : [];
@@ -387,15 +421,26 @@ function AppContent() {
               </Card>
               <Card style={{backgroundColor:colors.bgCard,borderColor:colors.border}}>
                 <Text style={[styles.cardTitle,{color:colors.text}]} numberOfLines={1}>{t('chat')} {uploadingMedia&&' ⏳'}</Text>
-                {partnerSleeping?(<View style={[styles.sleepBlock,{backgroundColor:colors.bg}]}><Text style={{fontSize:40}}>🌙</Text><Text style={[styles.sleepBlockTitle,{color:colors.accent}]} numberOfLines={1}>{partnerNickname} спит</Text></View>):(<View style={[styles.chatBox,{backgroundColor:colors.bg,borderColor:colors.border}]}>
-                  <FlatList ref={chatListRef} data={messages||[]} initialNumToRender={15} maxToRenderPerBatch={5} windowSize={10} removeClippedSubviews={true} keyExtractor={item=>item?.id||String(Math.random())} renderItem={({item})=>{if(!item)return null;return (<TouchableOpacity onLongPress={() => setShowReactions(item.id)} activeOpacity={0.9}><MessageBubble item={item} userRole={userRole} colors={colors} /></TouchableOpacity>);}} ListEmptyComponent={<View style={styles.chatEmptyContainer}><Text style={styles.chatEmptyIcon}>💬</Text><Text style={[styles.chatEmpty,{color:colors.textMuted}]}>{t('noMessages')}</Text></View>}/>
-                  {partnerTyping&&<Text style={[styles.typingText,{color:colors.textMuted}]} numberOfLines={1}>✍️ {partnerTyping} {t('typing')}</Text>}
-                </View>)}
-                {!partnerSleeping&&<View style={styles.chatInputRow}>
-                  <TouchableOpacity onPress={()=>{Alert.alert('Фото', 'В разработке');}} style={[styles.attachBtn,{backgroundColor:colors.bgCard}]}><Text style={[styles.attachText,{color: colors.textSecondary, fontWeight: '600'}]} numberOfLines={1}>📷</Text></TouchableOpacity>
-                  <TextInput style={[styles.chatInput,{backgroundColor:colors.bg,color:colors.text,borderColor:colors.border}]} placeholder={t('chat')} placeholderTextColor={colors.textMuted} value={chatInput} onChangeText={setChatInput} onSubmitEditing={()=>{if(!chatInput.trim()||!socketRef.current||partnerSleeping) return; const text=chatInput.trim(); const temp={id:'temp_'+Date.now(),pair_code:pairCode,user_id:userRole,nickname:myNickname||userRole,text,read_by_partner:false,created_at:new Date().toISOString(),temp:true}; setMessages(prev=>{const u=[...(prev||[]),temp];AsyncStorage.setItem('chatMessages',JSON.stringify(u));return u;}); setChatInput(''); setTotalMessages(p=>{const n=p+1;AsyncStorage.setItem('totalMessages',n.toString());return n;}); socketRef.current.emit('send-message',{code:pairCode,user:userRole,text,nickname:myNickname||userRole});}}/>
-                  <TouchableOpacity style={styles.sendBtn} onPress={()=>{if(!chatInput.trim()||!socketRef.current||partnerSleeping) return; const text=chatInput.trim(); const temp={id:'temp_'+Date.now(),pair_code:pairCode,user_id:userRole,nickname:myNickname||userRole,text,read_by_partner:false,created_at:new Date().toISOString(),temp:true}; setMessages(prev=>{const u=[...(prev||[]),temp];AsyncStorage.setItem('chatMessages',JSON.stringify(u));return u;}); setChatInput(''); setTotalMessages(p=>{const n=p+1;AsyncStorage.setItem('totalMessages',n.toString());return n;}); socketRef.current.emit('send-message',{code:pairCode,user:userRole,text,nickname:myNickname||userRole});}}><LinearGradient colors={[colors.primary,'#ff6b9d']} style={styles.sendBtnGradient}><Text style={styles.sendText}>{t('send')}</Text></LinearGradient></TouchableOpacity>
-                </View>}
+                {/* ✅ ИСПРАВЛЕНО 4: Чат блокируется когда партнер спит */}
+                {partnerSleeping ? (
+                  <View style={[styles.sleepBlock,{backgroundColor:colors.bg}]}>
+                    <Text style={{fontSize:40}}>🌙</Text>
+                    <Text style={[styles.sleepBlockTitle,{color:colors.accent}]} numberOfLines={1}>{partnerNickname} спит</Text>
+                    <Text style={{color:colors.textSecondary, fontSize:12, marginTop:4}}>Сообщения будут доставлены утром</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.chatBox,{backgroundColor:colors.bg,borderColor:colors.border}]}>
+                    <FlatList ref={chatListRef} data={messages||[]} initialNumToRender={15} maxToRenderPerBatch={5} windowSize={10} removeClippedSubviews={true} keyExtractor={item=>item?.id||String(Math.random())} renderItem={({item})=>{if(!item)return null;return (<TouchableOpacity onLongPress={() => setShowReactions(item.id)} activeOpacity={0.9}><MessageBubble item={item} userRole={userRole} colors={colors} /></TouchableOpacity>);}} ListEmptyComponent={<View style={styles.chatEmptyContainer}><Text style={styles.chatEmptyIcon}>💬</Text><Text style={[styles.chatEmpty,{color:colors.textMuted}]}>{t('noMessages')}</Text></View>}/>
+                    {partnerTyping&&<Text style={[styles.typingText,{color:colors.textMuted}]} numberOfLines={1}>✍️ {partnerTyping} {t('typing')}</Text>}
+                  </View>
+                )}
+                {!partnerSleeping && (
+                  <View style={styles.chatInputRow}>
+                    <TouchableOpacity onPress={()=>{Alert.alert('Фото', 'В разработке');}} style={[styles.attachBtn,{backgroundColor:colors.bgCard}]}><Text style={[styles.attachText,{color: colors.textSecondary, fontWeight: '600'}]} numberOfLines={1}>📷</Text></TouchableOpacity>
+                    <TextInput style={[styles.chatInput,{backgroundColor:colors.bg,color:colors.text,borderColor:colors.border}]} placeholder={t('chat')} placeholderTextColor={colors.textMuted} value={chatInput} onChangeText={setChatInput} onSubmitEditing={()=>{if(!chatInput.trim()||!socketRef.current) return; const text=chatInput.trim(); const temp={id:'temp_'+Date.now(),pair_code:pairCode,user_id:userRole,nickname:myNickname||userRole,text,read_by_partner:false,created_at:new Date().toISOString(),temp:true}; setMessages(prev=>{const u=[...(prev||[]),temp];AsyncStorage.setItem('chatMessages',JSON.stringify(u));return u;}); setChatInput(''); setTotalMessages(p=>{const n=p+1;AsyncStorage.setItem('totalMessages',n.toString());return n;}); socketRef.current.emit('send-message',{code:pairCode,user:userRole,text,nickname:myNickname||userRole});}}/>
+                    <TouchableOpacity style={styles.sendBtn} onPress={()=>{if(!chatInput.trim()||!socketRef.current) return; const text=chatInput.trim(); const temp={id:'temp_'+Date.now(),pair_code:pairCode,user_id:userRole,nickname:myNickname||userRole,text,read_by_partner:false,created_at:new Date().toISOString(),temp:true}; setMessages(prev=>{const u=[...(prev||[]),temp];AsyncStorage.setItem('chatMessages',JSON.stringify(u));return u;}); setChatInput(''); setTotalMessages(p=>{const n=p+1;AsyncStorage.setItem('totalMessages',n.toString());return n;}); socketRef.current.emit('send-message',{code:pairCode,user:userRole,text,nickname:myNickname||userRole});}}><LinearGradient colors={[colors.primary,'#ff6b9d']} style={styles.sendBtnGradient}><Text style={styles.sendText}>{t('send')}</Text></LinearGradient></TouchableOpacity>
+                  </View>
+                )}
               </Card>
               <Card style={{backgroundColor:colors.bgCard,borderColor:colors.border}}>
                 <View style={styles.cardHeader}><Text style={[styles.cardTitle,{color:colors.text}]} numberOfLines={1} style={{flex:1, marginRight: 8}}>{t('dates')}</Text><View style={{flexDirection:'row', gap:6, alignItems:'center'}}><TouchableOpacity onPress={()=>Alert.alert('Импорт', 'Только в мобильной версии')} style={[styles.importBtn]}><Text style={styles.importBtnText} numberOfLines={1}>📥</Text></TouchableOpacity><TouchableOpacity onPress={()=>setShowAddDateModal(true)} style={{paddingHorizontal:8, paddingVertical:4, backgroundColor:colors.primary+'20', borderRadius:6}}><Text style={[styles.addText,{color:colors.secondary}]} numberOfLines={1}>{t('addDate')}</Text></TouchableOpacity></View></View>
@@ -409,7 +454,6 @@ function AppContent() {
               </Card>
               <TouchableOpacity onPress={()=>{if(!socketRef.current)return; socketRef.current.emit('peace-request',{code:pairCode,user:userRole}); setPeaceActive(true); Alert.alert('🕊️ Отправлено');}} style={[styles.actionButton,{borderColor:colors.border}]}><LinearGradient colors={[colors.success,'#06d6a0']} style={styles.actionButtonGradient}><Text style={{fontSize:28,marginBottom:6}}>🕊️</Text><Text style={{color:'#fff',fontWeight:'700'}}>{t('peace')}</Text></LinearGradient></TouchableOpacity>
               
-              {/* ✅ ИСПРАВЛЕНО 4: Кнопка сна работает стабильно */}
               <TouchableOpacity onPress={()=>{if(!socketRef.current)return; const newState = !mySleeping; socketRef.current.emit('sleep-toggle',{pairCode,user:userRole,active:newState}); setMySleeping(newState);}} style={[styles.actionButton,{marginTop:10,borderColor:colors.border}]}><LinearGradient colors={mySleeping ? ['#4b5563','#6b7280'] : (themeMode==='light'?['#e5e7eb','#f3f4f6']:['#1a1a35','#2d2d55'])} style={styles.actionButtonGradient}><Text style={{fontSize:28,marginBottom:6}}>{mySleeping ? '☀️' : '🌙'}</Text><Text style={{color:mySleeping ? '#fbbf24' : (themeMode==='light'?colors.textSecondary:colors.accent),fontWeight:'700'}}>{mySleeping ? t('sleepOff') : t('sleepOn')}</Text></LinearGradient></TouchableOpacity>
               <View style={{height:30}}/>
             </ScrollView>
@@ -417,7 +461,22 @@ function AppContent() {
         )}
         {showReactions && (<Modal visible={true} transparent animationType="fade"><TouchableOpacity style={styles.modalOverlay} onPress={() => setShowReactions(null)}><View style={styles.reactionsPicker}>{['❤️','😂','','','',''].map(emoji => (<TouchableOpacity key={emoji} style={styles.reactionBtn} onPress={() => {setMessages(prev => prev.map(m => m.id === showReactions ? { ...m, reaction: emoji } : m)); setShowReactions(null);}}><Text style={{fontSize:22}}>{emoji}</Text></TouchableOpacity>))}</View></TouchableOpacity></Modal>)}
         
-        <Modal visible={showGenderModal} transparent animationType="fade"><View style={styles.modalOverlay}><View style={[styles.genderModalContent,{backgroundColor:colors.bgCard,borderColor:colors.border}]}><Text style={[styles.modalTitle,{color:colors.text}]} numberOfLines={1}>{t('selectGender')}</Text><View style={styles.genderButtons}><TouchableOpacity onPress={() => handleJoinWithGender('M')} style={[styles.genderButton,{backgroundColor:colors.bg,borderColor:colors.border}]}><Text style={{fontSize:40,marginBottom:10}}>👨</Text><Text style={[styles.genderButtonText,{color:colors.text}]} numberOfLines={1}>{t('male')}</Text></TouchableOpacity><TouchableOpacity onPress={() => handleJoinWithGender('Ж')} style={[styles.genderButton,{backgroundColor:colors.bg,borderColor:colors.border}]}><Text style={{fontSize:40,marginBottom:10}}>👩</Text><Text style={[styles.genderButtonText,{color:colors.text}]} numberOfLines={1}>{t('female')}</Text></TouchableOpacity></View><TouchableOpacity onPress={()=>{setShowGenderModal(false);setPendingPairData(null);}} style={{marginTop:16}}><Text style={[{color:colors.textSecondary,textAlign:'center'}]}>{t('cancel')}</Text></TouchableOpacity></View></View></Modal>
+        <Modal visible={showGenderModal} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.genderModalContent,{backgroundColor:colors.bgCard,borderColor:colors.border}]}>
+              <Text style={[styles.modalTitle,{color:colors.text}]} numberOfLines={1}>{pendingPairData?.isNew ? t('selectGender') : t('continue')}</Text>
+              {pendingPairData?.isNew ? (
+                <View style={styles.genderButtons}>
+                  <TouchableOpacity onPress={() => handleJoinWithGender('M')} style={[styles.genderButton,{backgroundColor:colors.bg,borderColor:colors.border}]}><Text style={{fontSize:40,marginBottom:10}}>👨</Text><Text style={[styles.genderButtonText,{color:colors.text}]} numberOfLines={1}>{t('male')}</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleJoinWithGender('Ж')} style={[styles.genderButton,{backgroundColor:colors.bg,borderColor:colors.border}]}><Text style={{fontSize:40,marginBottom:10}}>👩</Text><Text style={[styles.genderButtonText,{color:colors.text}]} numberOfLines={1}>{t('female')}</Text></TouchableOpacity>
+                </View>
+              ) : (
+                <Text style={{color:colors.textSecondary, textAlign:'center', marginBottom: 16}}>Ваш пол будет назначен автоматически (противоположный партнёру)</Text>
+              )}
+              <TouchableOpacity onPress={()=>{setShowGenderModal(false);setPendingPairData(null);}} style={{marginTop:16}}><Text style={[{color:colors.textSecondary,textAlign:'center'}]}>{t('cancel')}</Text></TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
         
         <Modal visible={showAddDateModal} transparent animationType="slide"><View style={styles.modalOverlay}><View style={[styles.modalContent,{backgroundColor:colors.bgCard,borderColor:colors.border}]}><Text style={[styles.modalTitle,{color:colors.text}]} numberOfLines={1}>{t('dates')}</Text><TextInput style={[styles.modalInput,{backgroundColor:colors.bg,color:colors.text,borderColor:colors.border}]} placeholder={t('dates')} value={dateTitle} onChangeText={setDateTitle}/><GradientButton onPress={()=>{if(!dateTitle.trim())return; const nd={id:Date.now().toString(),title:dateTitle,date:selectedDate.toISOString()}; const upd=[...importantDates,nd]; setImportantDates(upd); AsyncStorage.setItem('importantDates',JSON.stringify(upd)); setShowAddDateModal(false);setDateTitle('');}} title={t('save')} colors={[colors.primary,'#ff6b9d']}/><TouchableOpacity onPress={()=>setShowAddDateModal(false)} style={{marginTop:10}}><Text style={[{color:colors.textSecondary,textAlign:'center'}]}>{t('cancel')}</Text></TouchableOpacity></View></View></Modal>
         <Modal visible={showThemeModal} transparent animationType="slide"><View style={styles.modalOverlay}><View style={[styles.modalContent,{backgroundColor:colors.bgCard,borderColor:colors.border}]}><Text style={[styles.modalTitle,{color:colors.text}]} numberOfLines={1}>{t('theme')}</Text><View style={{flexDirection:'row',flexWrap:'wrap',gap:10,justifyContent:'center'}}>{Object.keys(themes).map(key => { const theme = themes[key]; const isUnlocked = key !== 'secret' || unlockedAchievements.includes('secret_theme'); const isSelected = themeMode === key; return (<TouchableOpacity key={key} disabled={!isUnlocked} onPress={() => { setThemeMode(key); AsyncStorage.setItem('themeMode', key); setShowThemeModal(false); }} style={[styles.themeOption,{backgroundColor:theme.bg,borderColor:isSelected?theme.primary:theme.border,opacity:isUnlocked?1:0.4}]}><Text style={{color:theme.text,fontSize:11,fontWeight:isSelected?'700':'400'}} numberOfLines={1} ellipsizeMode="tail">{theme.name}</Text>{!isUnlocked && <Text style={{fontSize:9,color:theme.textMuted}}>🔒</Text>}</TouchableOpacity>); })}</View><TouchableOpacity onPress={() => setShowThemeModal(false)} style={{marginTop: 14, padding: 10}}><Text style={[{color: colors.textSecondary, textAlign: 'center', fontWeight:'600'}]} numberOfLines={1}>{t('close')}</Text></TouchableOpacity></View></View></Modal>
